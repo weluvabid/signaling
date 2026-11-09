@@ -1,0 +1,4 @@
+{
+  "type": "answer",
+  "sdp": "v=0\r\no=- 73482910 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=group:BUNDLE 0 1\r\na=msid-semantic: WMS *\r\na=fingerprint:sha-256 AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99\r\na=ice-options:trickle\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\nc=IN IP4 0.0.0.0\r\na=rtcp:9 IN IP4 0.0.0.0\r\na=ice-ufrag:SaF1\r\na=ice-pwd:4sF8hJ2kL6mN0pQ3rT7vW1xYzAbCdEfG\r\na=mid:0\r\na=recvonly\r\na=rtcp-mux\r\na=rtpmap:111 opus/48000/2\r\na=setup:active\r\nm=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\nc=IN IP4 0.0.0.0\r\na=ice-ufrag:SaF1\r\na=ice-pwd:4sF8hJ2kL6mN0pQ3rT7vW1xYzAbCdEfG\r\na=mid:1\r\na=sctp-port:5000\r\na=max-message-size:65536\r\na=setup:active\r\n"
+}

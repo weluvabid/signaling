@@ -1,0 +1,98 @@
+{
+  "name": "@weluvabid/signaling",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Transport-agnostic, serverless signaling exchange for peer-to-peer applications.",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "docs",
+    "LICENSE",
+    "README.md",
+    "SECURITY.md"
+  ],
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "packageManager": "pnpm@12.18.0",
+  "license": "Apache-2.0",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./file": {
+      "types": "./dist/file.d.ts",
+      "import": "./dist/file.js"
+    },
+    "./clipboard": {
+      "types": "./dist/clipboard.d.ts",
+      "import": "./dist/clipboard.js"
+    },
+    "./qr": {
+      "types": "./dist/qr.d.ts",
+      "import": "./dist/qr.js"
+    },
+    "./webrtc": {
+      "types": "./dist/webrtc.d.ts",
+      "import": "./dist/webrtc.js"
+    }
+  },
+  "scripts": {
+    "build": "pnpm clean && tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint:fix": "eslint . --fix",
+    "test": "node --test",
+    "typecheck": "tsc --noEmit",
+    "benchmark": "pnpm build && node benchmarks/run.mjs",
+    "check": "pnpm build && pnpm verify:package && pnpm lint && pnpm test",
+    "prepack": "pnpm build",
+    "verify:package": "node scripts/verify-package.mjs",
+    "clean": "node scripts/clean.mjs",
+    "dev:interop": "vite --config vite.config.mjs"
+  },
+  "dependencies": {
+    "cborg": "6.1.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.14.0",
+    "fast-check": "4.10.2",
+    "globals": "17.13.0",
+    "prettier": "3.9.10",
+    "qr": "0.7.2",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1",
+    "vite": "8.3.7"
+  },
+  "peerDependencies": {
+    "qr": "0.7.2"
+  },
+  "peerDependenciesMeta": {
+    "qr": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/weluvabid/signaling.git"
+  },
+  "homepage": "https://github.com/weluvabid/signaling#readme",
+  "bugs": {
+    "url": "https://github.com/weluvabid/signaling/issues"
+  },
+  "keywords": [
+    "webrtc",
+    "peer-to-peer",
+    "signaling",
+    "cbor",
+    "qr-code",
+    "serverless"
+  ]
+}

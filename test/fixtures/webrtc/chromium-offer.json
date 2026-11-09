@@ -1,0 +1,4 @@
+{
+  "type": "offer",
+  "sdp": "v=0\r\no=- 46117326 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=group:BUNDLE 0 1\r\na=msid-semantic: WMS *\r\na=ice-options:trickle renomination\r\na=fingerprint:sha-256 11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00\r\na=extmap-allow-mixed\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111 0 8\r\nc=IN IP4 0.0.0.0\r\na=rtcp:9 IN IP4 0.0.0.0\r\na=ice-ufrag:K7gV\r\na=ice-pwd:8z2L4mQp7vN9xR3sT5wY1aBcDeFgHiJk\r\na=ice-options:trickle\r\na=mid:0\r\na=sendrecv\r\na=rtcp-mux\r\na=rtpmap:111 opus/48000/2\r\na=rtcp-fb:111 transport-cc\r\na=setup:actpass\r\na=ssrc:1001 cname:chromium-audio\r\nm=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\nc=IN IP4 0.0.0.0\r\na=ice-ufrag:K7gV\r\na=ice-pwd:8z2L4mQp7vN9xR3sT5wY1aBcDeFgHiJk\r\na=mid:1\r\na=sctp-port:5000\r\na=max-message-size:262144\r\na=setup:actpass\r\n"
+}

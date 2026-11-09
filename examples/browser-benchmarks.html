@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SEE browser performance harness</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font: 16px/1.5 system-ui, sans-serif;
+      }
+      body {
+        max-width: 900px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      button {
+        font: inherit;
+        padding: 0.5rem 0.8rem;
+      }
+      button:disabled {
+        opacity: 0.55;
+      }
+      #status,
+      #results {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        padding: 0.8rem;
+        border: 1px solid GrayText;
+        background: Canvas;
+      }
+      #results {
+        max-height: 28rem;
+        overflow: auto;
+      }
+      .hint {
+        opacity: 0.8;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>SEE browser performance harness</h1>
+    <p>
+      Measures browser-side QR frame generation and image-based QR reconstruction. This is separate
+      from the Node.js core benchmark. Run it on each browser/device you want to report.
+    </p>
+    <p class="hint">
+      The test creates real SVG QR frames, loads each frame as an image, decodes the images through
+      SEE's QR adapter, and verifies the reconstructed envelope. Large transfers can take time.
+      Keep the tab in the foreground and avoid other heavy workloads.
+    </p>
+    <p>
+      <label>
+        <input id="include-large" type="checkbox" /> Include 256 KiB workload (may be slow)
+      </label>
+    </p>
+    <button id="run">Run browser benchmarks</button>
+    <button id="download" disabled>Download JSON results</button>
+    <h2>Status</h2>
+    <pre id="status" role="status" aria-live="polite">Ready.</pre>
+    <h2>Results</h2>
+    <pre id="results">No results yet.</pre>
+
+    <script type="module">
+      import { encodeEnvelope, decodeEnvelope, fragmentEnvelope, FragmentReassembler } from '../dist/index.js';
+      import { encodeQrFrames, reassembleQrFrames } from '../dist/qr.js';
+
+      const $ = (id) => document.getElementById(id);
+      const qrIterations = 3;
+      const coreIterations = 1_000;
+      const compressionIterations = 100;
+      const transferIterations = 100;
+      const createdAt = 1_700_000_000_000;
+      let records = [];
+
+      function createPayload(size) {
+        const bytes = new Uint8Array(size);
+        let state = 0x51_47_4e;
+        for (let index = 0; index < size; index += 1) {
+          state ^= state << 13;
+          state ^= state >>> 17;
+          state ^= state << 5;
+          bytes[index] = state & 0xff;
+        }
+        return bytes;
+      }
+
+      function summarize(samples) {
+        const sorted = [...samples].sort((left, right) => left - right);
+        const percentile = (fraction) =>
+          Number(
+            sorted[Math.min(sorted.length - 1, Math.ceil(fraction * sorted.length) - 1)].toFixed(3),
+          );
+        const totalMs = samples.reduce((sum, value) => sum + value, 0);
+        return {
+          iterations: samples.length,
+          p50Ms: percentile(0.5),
+          ...(samples.length >= 100
+            ? { p95Ms: percentile(0.95), p99Ms: percentile(0.99) }
+            : {}),
+          maxMs: Number(Math.max(...samples).toFixed(3)),
+          meanMs: Number((totalMs / samples.length).toFixed(3)),
+        };
+      }
+
+      function loadImages(frames) {
+        return Promise.all(
+          frames.map((frame) => {
+            const image = new Image();
+            image.src = frame.dataUrl;
+            return image.decode().then(() => image);
+          }),
+        );
+      }
+
+      async function measureCore(payload) {
+        const input = {
+          kind: 'custom',
+          contentType: 'application/octet-stream',
+          createdAt,
+          payload,
+          compression: 'none',
+        };
+        const encodeSamples = [];
+        const decodeSamples = [];
+        const compressionEncodeSamples = [];
+        let compressionAppliedCount = 0;
+        let envelope;
+        for (let index = 0; index < coreIterations; index += 1) {
+          const start = performance.now();
+          envelope = await encodeEnvelope(input);
+          encodeSamples.push(performance.now() - start);
+        }
+        for (let index = 0; index < coreIterations; index += 1) {
+          const start = performance.now();
+          const decoded = await decodeEnvelope(envelope, { now: () => createdAt });
+          if (decoded.payload.byteLength !== payload.byteLength) {
+            throw new Error('Core decode returned an unexpected payload length');
+          }
+          decodeSamples.push(performance.now() - start);
+        }
+
+        for (let index = 0; index < compressionIterations; index += 1) {
+          const start = performance.now();
+          const compressedEnvelope = await encodeEnvelope({ ...input, compression: 'deflate' });
+          compressionEncodeSamples.push(performance.now() - start);
+          const compressedDecoded = await decodeEnvelope(compressedEnvelope, {
+            now: () => createdAt,
+          });
+          if (compressedDecoded.payload.byteLength !== payload.byteLength) {
+            throw new Error('Compression round-trip returned an unexpected payload length');
+          }
+          if (compressedDecoded.compression === 'deflate') compressionAppliedCount += 1;
+        }
+
+        const fragmentationSamples = [];
+        const reassemblySamples = [];
+        let fragmentCount = 0;
+        for (let index = 0; index < transferIterations; index += 1) {
+          let start = performance.now();
+          const fragments = await fragmentEnvelope(envelope);
+          fragmentationSamples.push(performance.now() - start);
+          fragmentCount = fragments.length;
+
+          start = performance.now();
+          const reassembler = new FragmentReassembler();
+          let result;
+          for (const fragment of fragments) result = await reassembler.add(fragment);
+          if (result?.status !== 'complete' || result.bytes.byteLength !== envelope.byteLength) {
+            throw new Error('Core fragment reassembly failed');
+          }
+          reassemblySamples.push(performance.now() - start);
+        }
+
+        return {
+          encode: summarize(encodeSamples),
+          decode: summarize(decodeSamples),
+          compressionRequestedEncode: summarize(compressionEncodeSamples),
+          compressionIterations,
+          compressionAppliedCount,
+          fragmentation: summarize(fragmentationSamples),
+          reassembly: summarize(reassemblySamples),
+          fragmentCount,
+          encodeIterations: coreIterations,
+          decodeIterations: coreIterations,
+          transferIterations,
+        };
+      }
+
+      async function runCase(payloadBytes) {
+        const payload = createPayload(payloadBytes);
+        const core = await measureCore(payload);
+        const envelope = await encodeEnvelope({
+          kind: 'custom',
+          contentType: 'application/octet-stream',
+          createdAt,
+          payload,
+          compression: 'none',
+        });
+        const encodeSamples = [];
+        const imageLoadSamples = [];
+        const decodeSamples = [];
+        const endToEndSamples = [];
+        let frameCount = 0;
+        let totalFrameCharacters = 0;
+
+        for (let iteration = 0; iteration < qrIterations; iteration += 1) {
+          const endToEndStart = performance.now();
+          let start = performance.now();
+          const frames = await encodeQrFrames(envelope, { errorCorrectionLevel: 'M' });
+          encodeSamples.push(performance.now() - start);
+          frameCount = frames.length;
+          totalFrameCharacters = frames.reduce((sum, frame) => sum + frame.dataUrl.length, 0);
+
+          start = performance.now();
+          const images = await loadImages(frames);
+          imageLoadSamples.push(performance.now() - start);
+          start = performance.now();
+          const reconstructed = await reassembleQrFrames(images);
+          decodeSamples.push(performance.now() - start);
+          if (
+            reconstructed.byteLength !== envelope.byteLength ||
+            reconstructed.some((value, index) => value !== envelope[index])
+          ) {
+            throw new Error(`QR reconstruction mismatch for ${payloadBytes} byte payload`);
+          }
+          const decoded = await decodeEnvelope(reconstructed, { now: () => createdAt });
+          if (decoded.payload.byteLength !== payload.byteLength) {
+            throw new Error(`Decoded payload length mismatch for ${payloadBytes} byte payload`);
+          }
+          endToEndSamples.push(performance.now() - endToEndStart);
+        }
+
+        return {
+          recordType: 'browser-case',
+          payloadBytes,
+          envelopeBytes: envelope.byteLength,
+          iterations: qrIterations,
+          core,
+          frameCount,
+          totalSvgDataUrlCharacters: totalFrameCharacters,
+          qrEncode: summarize(encodeSamples),
+          imageLoad: summarize(imageLoadSamples),
+          qrImageDecodeAndReassembly: summarize(decodeSamples),
+          endToEnd: summarize(endToEndSamples),
+        };
+      }
+
+      $('run').addEventListener('click', async () => {
+        $('run').disabled = true;
+        $('download').disabled = true;
+        records = [];
+        $('results').textContent = 'Running…';
+        try {
+          records.push({
+            recordType: 'browser-metadata',
+            timestamp: new Date().toISOString(),
+            userAgent: navigator.userAgent,
+            platform: navigator.platform,
+            language: navigator.language,
+            hardwareConcurrency: navigator.hardwareConcurrency ?? null,
+            deviceMemoryGiB: navigator.deviceMemory ?? null,
+            viewport: { width: innerWidth, height: innerHeight, devicePixelRatio },
+            qrIterations,
+            coreIterations,
+            compressionIterations,
+            transferIterations,
+          });
+          const sizes = [1_024, 16_384, 65_536];
+          if ($('include-large').checked) sizes.push(262_144);
+          for (const size of sizes) {
+            $('status').textContent = `Running ${size.toLocaleString()} byte QR workload…`;
+            records.push(await runCase(size));
+            $('results').textContent = records.map((record) => JSON.stringify(record)).join('\n');
+          }
+          $('status').textContent =
+            'Complete. Download the JSON results and retain them with the browser/device details.';
+          $('download').disabled = false;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          $('status').textContent = `Benchmark failed: ${message}`;
+          $('results').textContent = records.map((record) => JSON.stringify(record)).join('\n');
+        } finally {
+          $('run').disabled = false;
+        }
+      });
+
+      $('download').addEventListener('click', () => {
+        const blob = new Blob([records.map((record) => JSON.stringify(record)).join('\n') + '\n'], {
+          type: 'application/x-ndjson',
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `see-browser-${new Date().toISOString().replaceAll(':', '-')}.jsonl`;
+        link.click();
+        URL.revokeObjectURL(url);
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,32 @@
+[
+  {
+    "candidate": "candidate:1 1 udp 2122260223 192.0.2.10 50000 typ host generation 0 ufrag K7gV network-id 1",
+    "sdpMid": "0",
+    "sdpMLineIndex": 0,
+    "usernameFragment": "K7gV"
+  },
+  {
+    "candidate": "candidate:2 1 udp 2122260223 2001:db8::10 50001 typ host generation 0 ufrag K7gV network-id 2",
+    "sdpMid": "0",
+    "sdpMLineIndex": 0,
+    "usernameFragment": "K7gV"
+  },
+  {
+    "candidate": "candidate:3 1 udp 1686052607 198.51.100.20 62000 typ srflx raddr 192.0.2.10 rport 50000 generation 0 ufrag K7gV",
+    "sdpMid": "0",
+    "sdpMLineIndex": 0,
+    "usernameFragment": "K7gV"
+  },
+  {
+    "candidate": "candidate:4 1 udp 41885695 203.0.113.30 55000 typ relay raddr 198.51.100.20 rport 62000 generation 0 ufrag K7gV",
+    "sdpMid": "0",
+    "sdpMLineIndex": 0,
+    "usernameFragment": "K7gV"
+  },
+  {
+    "candidate": "candidate:5 1 tcp 1518280447 2001:db8::20 9 typ host tcptype active generation 0 ufrag K7gV",
+    "sdpMid": "1",
+    "sdpMLineIndex": 1,
+    "usernameFragment": "K7gV"
+  }
+]
