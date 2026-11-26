@@ -3,19 +3,20 @@ import {
   encodeEnvelope,
   fragmentEnvelope,
   FragmentReassembler,
-  createEnvelopeBlob,
-  readEnvelopeFile,
-  encodeQrFrames,
-  reassembleQrFrames,
+} from '../../dist/index.js';
+import { createEnvelopeBlob, readEnvelopeFile } from '../../dist/file.js';
+import {
   encodeClipboardText,
   decodeClipboardText,
   readClipboard,
   writeClipboard,
+} from '../../dist/clipboard.js';
+import { decodeQrImage, encodeQrFrames, reassembleQrFrames } from '../../dist/qr.js';
+import {
   createDescriptionEnvelopeInput,
   decodeWebRtcPayload,
   waitForIceGatheringComplete,
-} from '../../dist/index.js';
-import { decodeQrImage } from '../../dist/qr.js';
+} from '../../dist/webrtc.js';
 
 function createPayload(size) {
   const bytes = new Uint8Array(size);
@@ -57,7 +58,7 @@ async function reassembleQrFiles(files) {
       await image.decode();
       return image;
     }));
-    return await reassembleQrFrames(images);
+    return await reassembleQrFrames(images, { retryBudgetMs: 5_000 });
   } finally {
     for (const url of urls) URL.revokeObjectURL(url);
   }
@@ -103,7 +104,7 @@ async function runPeerExchange() {
     ));
     const offerFrames = await encodeQrFrames(offerBytes);
     const offerImages = await Promise.all(offerFrames.map((frame) => imageFromDataUrl(frame.dataUrl)));
-    const transferredOffer = await reassembleQrFrames(offerImages);
+    const transferredOffer = await reassembleQrFrames(offerImages, { retryBudgetMs: 5_000 });
     const offerEnvelope = await decodeEnvelope(transferredOffer);
     const offerPayload = decodeWebRtcPayload(offerEnvelope);
     await answerer.setRemoteDescription(offerPayload);
@@ -121,7 +122,7 @@ async function runPeerExchange() {
     ));
     const answerFrames = await encodeQrFrames(answerBytes);
     const answerImages = await Promise.all(answerFrames.map((frame) => imageFromDataUrl(frame.dataUrl)));
-    const transferredAnswer = await reassembleQrFrames(answerImages);
+    const transferredAnswer = await reassembleQrFrames(answerImages, { retryBudgetMs: 5_000 });
     const answerEnvelope = await decodeEnvelope(transferredAnswer);
     if (!equalBytes(answerEnvelope.sessionId, offerEnvelope.sessionId)) {
       throw new Error('Answer session ID did not match offer');

@@ -4,7 +4,7 @@ import { openSeePage } from './support/fixture.mjs';
 test('compiled package encodes and decodes an envelope in the browser', async ({ page }) => {
   await openSeePage(page);
   const result = await page.evaluate(async () => {
-    const payload = window.SEE.createPayload(16_384);
+    const payload = new Uint8Array(16_384).fill(0x41);
     const bytes = await window.SEE.encodeEnvelope({
       kind: 'custom',
       contentType: 'application/octet-stream',

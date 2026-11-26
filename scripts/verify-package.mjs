@@ -20,7 +20,7 @@ assert.ok(packageJson.files.includes('docs'));
 const coreEntrypoint = await readFile(path.join(root, 'dist/index.js'), 'utf8');
 assert.doesNotMatch(
   coreEntrypoint,
-  /transports\/qr|webrtc\/index|transports\/file|transports\/clipboard/u,
+  /(?:transports\/(?:qr|file|clipboard)|webrtc\/index|from\s+['"]\.\/(?:file|clipboard|qr|webrtc)\.js['"])/u,
   'Core entry point must not pull in adapters',
 );
 
