@@ -20,20 +20,45 @@ The benchmark builds the package before running. Configuration is controlled wit
 | `BENCH_TRANSFER_ITERATIONS` | 1,000 | 100–1,000 |
 | `BENCH_THROUGHPUT_BATCH` | 100 | 10–1,000 |
 
-To write clean JSONL results:
+## Running and exporting a benchmark
+
+Run the suite with output captured automatically:
+
+```sh
+pnpm benchmark:run
+```
+
+Each invocation creates a unique directory under `benchmarks/results/`:
+
+```text
+benchmarks/results/<run-id>/
+├── results.jsonl
+└── summary.json
+```
+
+`results.jsonl` is the source of truth: it contains the metadata record followed by every case record, including each individual `samplesMs` observation. `metadata.json` exposes the first record separately for convenient inspection. `summary.json` is a compact, deterministic projection of those records for quick inspection. The runner validates the JSONL as it is written, checks the expected 32 cases, verifies sample counts against the configured iteration counts, and refuses to produce a summary for an incomplete or malformed run. If the benchmark process fails, its partial raw output is retained for diagnosis.
+
+The terminal prints only the run ID and output paths. No benchmark records are streamed to the terminal, so shell scrollback limits cannot truncate the saved measurements.
+
+Create a ZIP suitable for sharing:
+
+```sh
+pnpm benchmark:archive
+```
+
+This archives the latest completed run. To archive a specific run, pass its directory name:
+
+```sh
+pnpm benchmark:archive <run-id>
+```
+
+The archive contains the complete run directory, including raw measurements and summary. The archive command uses the system `zip` utility.
+
+The low-level runner remains available for piping JSONL manually:
 
 ```sh
 pnpm build
-mkdir -p benchmarks/results
-node benchmarks/run.mjs > benchmarks/results/see-$(date +%Y%m%d-%H%M%S).jsonl
-```
-
-For three runs with identical settings:
-
-```sh
-for run in 1 2 3; do
-  node benchmarks/run.mjs > "benchmarks/results/see-run-${run}.jsonl"
-done
+node benchmarks/run.mjs > benchmarks/results/manual-run.jsonl
 ```
 
 Each output contains a metadata record followed by one result record for each payload-size and compression combination. Every measured operation includes its individual `samplesMs` values; percentile and throughput fields are derived from those samples.

@@ -53,7 +53,9 @@
     "verify:package": "node scripts/verify-package.mjs",
     "clean": "node scripts/clean.mjs",
     "test:browser": "playwright test",
-    "browsers:install": "playwright install chromium firefox webkit"
+    "browsers:install": "playwright install chromium firefox webkit",
+    "benchmark:run": "pnpm build && node scripts/run-benchmark.mjs",
+    "benchmark:archive": "node scripts/archive-benchmark.mjs"
   },
   "dependencies": {
     "cborg": "6.1.3"

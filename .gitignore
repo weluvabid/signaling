@@ -33,3 +33,7 @@ out/
 playwright-report/
 test-results/
 blob-report/
+
+# Generated benchmark runs and archives
+benchmarks/results/*/
+benchmarks/results/*.zip
