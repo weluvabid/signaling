@@ -145,10 +145,14 @@ pnpm benchmark:browser
 
 The default run uses Chromium, payload sizes of 1 KiB, 16 KiB, and 64 KiB,
 30 envelope encode/decode samples, 10 compression samples, 20 transfer samples,
-5 warmup encode/decode pairs, and 20 QR encode/reassembly samples (plus one QR
-warmup). Results are appended to JSONL as each payload size completes, and progress
-is printed before the QR stage so long QR workloads remain visible. The defaults are
-intended to complete as a practical local run rather than an extended soak test.
+5 warmup encode/decode pairs, and up to 20 QR samples. QR sampling adapts to the
+number of generated frames: transfers with at least 64 frames use at most 3 QR encode
+samples, 1 full QR decode/reassembly sample, and skip the full-transfer QR warmup.
+Smaller transfers retain the configured QR sample and warmup counts. Each case records
+its effective QR encode, decode, and warmup counts. This bounds the 64 KiB workload,
+which contains 78 QR frames, while retaining a complete full-frame reconstruction
+measurement. Results are appended to JSONL as each payload size completes, and
+progress is printed for QR encoding, image loading, and QR reconstruction.
 Select browser engines and workloads with environment variables:
 
 ```sh
@@ -182,12 +186,15 @@ as separate measurements:
   image loading, and QR reconstruction. It is not a library-only latency and must
   not be used as the library's encode/decode performance figure.
 
-The browser harness warms the envelope APIs before sampling and performs a separate
-QR warmup. QR frames are encoded for every QR sample, then their image objects are
-loaded once and reused for repeated `reassembleQrFrames` samples. This keeps browser
-image decoding out of library reconstruction timings and avoids repeating an
-unnecessary browser operation for every library sample. Image loading is reported
-separately with its actual one-sample count.
+The browser harness warms the envelope APIs before sampling. For smaller QR transfers,
+it also performs a separate QR warmup, encodes the configured number of samples, loads
+the generated images once, and reuses those image objects for repeated
+`reassembleQrFrames` samples. For transfers with at least 64 frames, it skips the
+full-transfer QR warmup, limits encoding to at most 3 samples, and performs one full
+reconstruction. This avoids repeatedly decoding the same 78 images while still
+measuring a complete reconstruction. The actual sample counts are stored in each
+case as `qrEncodeIterations`, `qrDecodeIterations`, and `qrWarmupIterations`. Image
+loading is reported separately with its actual one-sample count.
 
 Timed regions exclude correctness comparisons and reporting work. Browser percentiles
 use four decimal places to preserve sub-millisecond values. p95 is emitted when a

@@ -58,7 +58,8 @@ try {
           process.stdout.write(
             `[${browserName}] ${record.payloadBytes} B complete ` +
             `(encode p50 ${record.encode.p50Ms} ms, decode p50 ${record.decode.p50Ms} ms, ` +
-            `QR decode p50 ${record.qrDecodeAndReassembly.p50Ms} ms)\n`,
+            `QR encode ${record.qrEncode.iterations} samples, ` +
+            `QR decode ${record.qrDecodeAndReassembly.iterations} sample(s))\n`,
           );
         }
       });
@@ -179,11 +180,26 @@ try {
               reassemblySamples.push(reassemblyElapsed);
             }
 
+            // QR cost scales with frame count. Keep the full configured sample
+            // count for small transfers, but bound large transfers so one browser
+            // engine does not repeatedly decode the same 78 images.
+            const qrFragmentCount = (
+              await see.fragmentEnvelope(envelope, { maxFragmentDataBytes: 850 })
+            ).length;
+            const largeQrCase = qrFragmentCount >= 64;
+            const effectiveQrEncodeIterations = largeQrCase
+              ? Math.min(qrIterations, 3)
+              : qrIterations;
+            const effectiveQrDecodeIterations = largeQrCase ? 1 : qrIterations;
+            const effectiveQrWarmupIterations = largeQrCase ? 0 : qrWarmupIterations;
+
             await window.__SEE_REPORT__({
               recordType: 'browser-progress',
-              message: `${payloadBytes} B: starting QR encode/reassembly (${qrIterations} samples)`,
+              message: `${payloadBytes} B: QR workload ${qrFragmentCount} frames; ` +
+                `encode ${effectiveQrEncodeIterations} samples, ` +
+                `decode/reassembly ${effectiveQrDecodeIterations} sample(s)`,
             });
-            for (let index = 0; index < qrWarmupIterations; index += 1) {
+            for (let index = 0; index < effectiveQrWarmupIterations; index += 1) {
               const warmQrFrames = await see.encodeQrFrames(envelope, { errorCorrectionLevel: 'M' });
               const warmQrImages = await Promise.all(
                 warmQrFrames.map((frame) => see.imageFromDataUrl(frame.dataUrl)),
@@ -196,7 +212,11 @@ try {
             let frames;
             let qrFrameCount = 0;
             let svgCharacters = 0;
-            for (let index = 0; index < qrIterations; index += 1) {
+            for (let index = 0; index < effectiveQrEncodeIterations; index += 1) {
+              await window.__SEE_REPORT__({
+                recordType: 'browser-progress',
+                message: `${payloadBytes} B: QR encode ${index + 1}/${effectiveQrEncodeIterations}`,
+              });
               const start = performance.now();
               frames = await see.encodeQrFrames(envelope, { errorCorrectionLevel: 'M' });
               qrEncodeSamples.push(performance.now() - start);
@@ -207,10 +227,20 @@ try {
             // Load each generated QR image once. Reuse the decoded image objects
             // for library-only reconstruction samples so browser image decoding
             // is never charged to the signaling library or repeated needlessly.
+            await window.__SEE_REPORT__({
+              recordType: 'browser-progress',
+              message: `${payloadBytes} B: loading ${qrFrameCount} QR images once`,
+            });
             const imageLoadStart = performance.now();
-            const images = await Promise.all(frames.map((frame) => see.imageFromDataUrl(frame.dataUrl)));
+            const images = await Promise.all(
+              frames.map((frame) => see.imageFromDataUrl(frame.dataUrl)),
+            );
             const imageLoadSamples = [performance.now() - imageLoadStart];
-            for (let index = 0; index < qrIterations; index += 1) {
+            for (let index = 0; index < effectiveQrDecodeIterations; index += 1) {
+              await window.__SEE_REPORT__({
+                recordType: 'browser-progress',
+                message: `${payloadBytes} B: QR decode/reassembly ${index + 1}/${effectiveQrDecodeIterations}`,
+              });
               const start = performance.now();
               const reconstructed = await see.reassembleQrFrames(images);
               qrDecodeSamples.push(performance.now() - start);
@@ -236,6 +266,9 @@ try {
               imageLoad: summarize(imageLoadSamples),
               qrDecodeAndReassembly: summarize(qrDecodeSamples),
               qrIterations,
+              qrEncodeIterations: effectiveQrEncodeIterations,
+              qrDecodeIterations: effectiveQrDecodeIterations,
+              qrWarmupIterations: effectiveQrWarmupIterations,
               qrFrameCount,
               totalSvgDataUrlCharacters: svgCharacters,
             });
