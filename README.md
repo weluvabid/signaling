@@ -99,7 +99,6 @@ The general fragmenter defaults to 16 KiB payloads. The QR adapter caps fragment
 - [Security model](docs/security.md)
 - [Benchmarks](docs/benchmarks.md)
 - [Glossary](docs/glossary.md)
-- [Browser tests and benchmarks](docs/benchmarks.md)
 
 ## Development
 

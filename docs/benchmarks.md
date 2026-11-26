@@ -182,10 +182,6 @@ as separate measurements:
   objects. Image construction/loading is not included.
 - `imageLoad` is reported separately. It measures browser `Image`/data-URL loading,
   not a signaling-library operation.
-- `endToEnd` is an integration measurement covering QR frame generation, browser
-  image loading, and QR reconstruction. It is not a library-only latency and must
-  not be used as the library's encode/decode performance figure.
-
 The browser harness warms the envelope APIs before sampling. For smaller QR transfers,
 it also performs a separate QR warmup, encodes the configured number of samples, loads
 the generated images once, and reuses those image objects for repeated
@@ -205,3 +201,128 @@ Each run writes newline-delimited JSON under `benchmarks/results/`. The metadata
 record is written before sampling, and each payload result is appended immediately
 when that payload completes. An interrupted run therefore retains completed records
 instead of losing the entire run.
+
+
+## Recorded browser results
+
+The checked-in browser result files contain one completed run for each browser
+engine, recorded on 2026-11-26:
+
+| Browser | Version | Logical CPUs reported | Envelope samples | Transfer samples | QR samples |
+|---|---:|---:|---:|---:|---:|
+| Chromium | 148.0.7778.96 | 14 | 30 | 20 | 20 for 1/16/64 KiB |
+| Firefox | 150.0.2 | 14 | 30 | 20 | 20 for 1/16/64 KiB |
+| WebKit | 26.4 | 8 | 30 | 20 | 20 for 1/16 KiB; 3 encode and 1 decode for 64 KiB |
+
+The browser benchmark used 5 envelope warmups, 1 QR warmup for the 1 KiB and
+16 KiB cases, 10 compression-request samples, and 20 transfer samples. The
+64 KiB WebKit QR case used the actual reduced counts shown above and skipped
+the QR warmup. The 64 KiB QR reconstruction still processed all 78 frames.
+
+### Envelope operations
+
+Values are p50 / p95 in milliseconds. Each cell contains the browser's own
+reported values; timer precision differs between engines.
+
+| Payload | Chromium encode | Firefox encode | WebKit encode | Chromium decode | Firefox decode | WebKit decode |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 KiB | 0 / 0.1 | 0 / 1 | 0 / 1 | 0 / 0.1 | 0 / 1 | 0 / 1 |
+| 16 KiB | 0 / 0.1 | 0 / 1 | 0 / 1 | 0 / 0.2 | 0 / 1 | 0 / 1 |
+| 64 KiB | 0.1 / 0.1 | 0 / 1 | 0 / 1 | 0.1 / 0.2 | 0 / 1 | 0 / 1 |
+
+Mean encode / decode latencies (milliseconds):
+
+| Payload | Chromium encode / decode | Firefox encode / decode | WebKit encode / decode |
+|---:|---:|---:|---:|
+| 1 KiB | 0.0500 / 0.0433 | 0.0667 / 0.0667 | 0.1000 / 0.1333 |
+| 16 KiB | 0.0267 / 0.0433 | 0.0667 / 0.1000 | 0.0667 / 0.1000 |
+| 64 KiB | 0.0567 / 0.1067 | 0.1333 / 0.2333 | 0.1000 / 0.1333 |
+
+### Fragmentation and reassembly
+
+Values are p50 / p95 in milliseconds.
+
+| Payload | Chromium fragmentation | Firefox fragmentation | WebKit fragmentation | Chromium reassembly | Firefox reassembly | WebKit reassembly |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 KiB | 0 / 0.1 | 0 / 0 | 0 / 0 | 0 / 0.1 | 0 / 0 | 0 / 0 |
+| 16 KiB | 0 / 0.1 | 0 / 0 | 0 / 0 | 0 / 0.1 | 0 / 1 | 0 / 1 |
+| 64 KiB | 0.1 / 0.1 | 0 / 1 | 0 / 1 | 0.2 / 0.4 | 0 / 1 | 0 / 1 |
+
+Mean fragmentation / reassembly latencies (milliseconds):
+
+| Payload | Chromium | Firefox | WebKit |
+|---:|---:|---:|---:|
+| 1 KiB | 0.0150 / 0.0350 | 0 / 0.0500 | 0.0500 / 0.0500 |
+| 16 KiB | 0.0450 / 0.0450 | 0 / 0.1500 | 0.0500 / 0.2000 |
+| 64 KiB | 0.0750 / 0.2050 | 0.1500 / 0.1000 | 0.2000 / 0.1000 |
+
+Firefox and WebKit report millisecond-granularity values in these runs. A reported
+`0` is below the timer's reported resolution, not a claim that the operation takes
+literally no time.
+
+### QR frame encoding
+
+Values are p50 / p95 in milliseconds. A dash means the sample count did not meet
+the benchmark's 20-sample p95 reporting threshold.
+
+| Payload | Frames | Chromium | Firefox | WebKit |
+|---:|---:|---:|---:|---:|
+| 1 KiB | 2 | 17 / 20.1 | 14 / 18 | 19 / 20 |
+| 16 KiB | 20 | 218.6 / 223.3 | 169 / 178 | 242 / 248 |
+| 64 KiB | 78 | 878.8 / 888.1 | 683 / 702 | 1,036 / — |
+
+### QR decoding and reassembly
+
+The timer covers `reassembleQrFrames` on image objects that have already been
+loaded. It excludes browser image construction/loading.
+
+Values are p50 / p95 in milliseconds.
+
+| Payload | Frames | Chromium | Firefox | WebKit |
+|---:|---:|---:|---:|---:|
+| 1 KiB | 2 | 42.1 / 43.6 | 4 / 8 | 46 / 64 |
+| 16 KiB | 20 | 547.5 / 564.3 | 50 / 53 | 573 / 621 |
+| 64 KiB | 78 | 2,199 / 2,253.8 | 211 / 255 | 9,208 / — |
+
+The 64 KiB WebKit case completed with 3 QR encoding samples and 1 full
+78-frame reconstruction sample. Its p50 is the sole measured sample; p95 is
+not emitted. The other 64 KiB browser QR cases used 20 samples each.
+
+The raw distributions also preserve the tail behaviour: Firefox's 16 KiB
+QR reconstruction has a 50 ms p50, 53 ms p95, 80.35 ms mean, and 647 ms max;
+WebKit's corresponding values are 573 ms, 621 ms, 655.2 ms, and 2,064 ms.
+Firefox's 64 KiB reconstruction is 211 ms p50, 255 ms p95, 354.95 ms mean,
+and 2,991 ms max.
+
+### Browser image loading
+
+`imageLoad` measures loading the generated QR image data URLs into browser image
+objects. It is reported separately and is not included in library QR encoding or
+reconstruction timings. Each value below is one image-loading measurement.
+
+| Payload | Chromium | Firefox | WebKit |
+|---:|---:|---:|---:|
+| 1 KiB | 89.6 ms | 266 ms | 195 ms |
+| 16 KiB | 1,166.8 ms | 3,753 ms | 2,403 ms |
+| 64 KiB | 4,847.5 ms | 15,994 ms | 10,037 ms |
+
+### Compression outcome
+
+Compression was requested for 10 samples per payload and browser. The
+`compressionAppliedCount` was zero in every browser/payload case. These runs
+therefore measure the requested-compression encode path, but do not demonstrate
+retained DEFLATE compression or compression savings. The Node.js benchmark
+results above separately exercise the compression heuristic with compressible
+and incompressible fixtures.
+
+### Browser result artifacts
+
+Raw browser measurements are checked in alongside the Node.js runs:
+
+- `benchmarks/results/see-browser-chromium-2026-11-26.jsonl`
+- `benchmarks/results/see-browser-firefox-2026-11-26.jsonl`
+- `benchmarks/results/see-browser-webkit-2026-11-26.jsonl`
+
+Each file contains its browser metadata record followed by the three payload
+case records. The recorded sample counts, browser versions, image-loading times,
+and QR frame counts are preserved in those JSONL files.
