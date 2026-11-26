@@ -21,3 +21,20 @@ export {
 } from './core/limits.js';
 export { SignalingError, type SignalingErrorCode } from './core/errors.js';
 export { ENVELOPE_VERSION } from './core/constants.js';
+export {
+  createCandidatesEnvelopeInput,
+  createCandidatesPayload,
+  createDescriptionEnvelopeInput,
+  createDescriptionPayload,
+  decodeWebRtcPayload,
+  parseCandidatesPayload,
+  parseDescriptionPayload,
+  waitForIceGatheringComplete,
+  type WebRtcCandidatesPayload,
+  type WebRtcDescriptionPayload,
+} from './webrtc.js';
+
+export {
+  CONTENT_TYPE_WEBRTC_CANDIDATES,
+  CONTENT_TYPE_WEBRTC_DESCRIPTION,
+} from './core/constants.js';

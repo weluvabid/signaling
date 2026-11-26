@@ -15,6 +15,10 @@ export default tseslint.config(
     languageOptions: { globals: globals.nodeBuiltin },
   },
   {
+    files: ['tests/browser/**/*.js', 'benchmarks/browser.mjs'],
+    languageOptions: { globals: { ...globals.nodeBuiltin, ...globals.browser } },
+  },
+  {
     rules: {
       '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports' }],
       '@typescript-eslint/ban-ts-comment': ['error', { 'ts-ignore': 'allow-with-description' }],

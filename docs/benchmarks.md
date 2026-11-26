@@ -123,23 +123,29 @@ Important fields:
 - `peakRetainedBytes` — fragment payload bytes tracked by the reassembler.
 - `operationsPerSecond` and `mebibytesPerSecond` — throughput over the complete measured batch.
 
-## Browser benchmarks
+## Browser tests and benchmarks
 
-The browser harness measures browser-side envelope operations and QR image processing separately from the Node.js suite.
+Playwright runs the compiled package in Chromium, Firefox, and WebKit. The browser suite covers envelope encoding and decoding, file import, clipboard exchange, QR frame generation and reconstruction, image limits, and WebRTC offer/answer exchange between independent peers.
+
+Install the browser binaries and run the suite:
 
 ```sh
-pnpm build
-pnpm dev:interop
+pnpm browsers:install
+pnpm test:browser
 ```
 
-Open `http://127.0.0.1:4173/examples/browser-benchmarks.html`.
+The browser benchmark runner measures envelope encoding and decoding, DEFLATE-requested encoding with decode verification, fragmentation, reassembly, QR frame generation, image loading, QR decoding, and end-to-end reconstruction.
 
-The harness measures:
+```sh
+pnpm benchmark:browser
+```
 
-- Envelope encode and decode: 1,000 iterations each.
-- DEFLATE-requested encode and round-trip: 100 iterations.
-- Fragmentation and reassembly: 100 iterations each.
-- QR SVG frame generation, image loading, QR decoding, reassembly, and end-to-end duration: 3 iterations.
-- Payload sizes of 1 KiB, 16 KiB, and 64 KiB, with an optional 256 KiB workload.
+The default run uses Chromium, payload sizes of 1 KiB, 16 KiB, and 64 KiB, 1,000 envelope encode/decode iterations, 100 compression iterations, 100 transfer iterations, and 3 QR iterations. Select browser engines and workloads with environment variables:
 
-Core operations report p50, p95, and p99. QR image operations report p50, mean, and maximum. The page exports newline-delimited JSON. Run it separately in each target browser/device and retain browser version, OS/device, image dimensions, and frame count with the results.
+```sh
+SEE_BROWSERS=chromium,firefox,webkit pnpm benchmark:browser
+SEE_BROWSER_BENCH_SIZES=1024,16384,65536,262144 pnpm benchmark:browser
+SEE_BROWSER_BENCH_ITERATIONS=1000 pnpm benchmark:browser
+```
+
+Each run writes newline-delimited JSON under `benchmarks/results/`. The first record contains browser and device metadata; each following record contains the measured workload and latency percentiles.

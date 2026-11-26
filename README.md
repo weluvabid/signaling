@@ -99,7 +99,7 @@ The general fragmenter defaults to 16 KiB payloads. The QR adapter caps fragment
 - [Security model](docs/security.md)
 - [Benchmarks](docs/benchmarks.md)
 - [Glossary](docs/glossary.md)
-- [Browser benchmark harness](examples/browser-benchmarks.html)
+- [Browser tests and benchmarks](docs/benchmarks.md)
 
 ## Development
 
@@ -113,6 +113,8 @@ pnpm install --no-frozen-lockfile
 pnpm check
 pnpm format:check
 pnpm benchmark
+pnpm browsers:install
+pnpm test:browser
 ```
 
 ## License

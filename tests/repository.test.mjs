@@ -46,18 +46,20 @@ test('project documentation contains the protocol and security specifications', 
   ]);
 
   assert.match(protocol, /Signaling Exchange Envelope/u);
-  assert.match(security, /Integrity is not authentication/u);
+  assert.match(security, /does not identify the sender/u);
   assert.match(api, /FragmentReassembler/u);
 });
 
 test('browser interoperability harness and benchmark methodology are documented', async () => {
-  const [harness, benchmarkGuide] = await Promise.all([
-    readFile(new URL('../examples/browser-interoperability.html', import.meta.url), 'utf8'),
+  const [playwrightConfig, browserSuite, benchmarkGuide] = await Promise.all([
+    readFile(new URL('../playwright.config.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../tests/browser/webrtc.spec.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../docs/benchmarks.md', import.meta.url), 'utf8'),
   ]);
 
-  assert.match(harness, /RTCPeerConnection/u);
-  assert.match(harness, /reassembleQrFrames/u);
-  assert.match(harness, /SEE_INTEROP_PING/u);
-  assert.match(benchmarkGuide, /1,000/u);
+  assert.match(playwrightConfig, /chromium/u);
+  assert.match(playwrightConfig, /firefox/u);
+  assert.match(playwrightConfig, /webkit/u);
+  assert.match(browserSuite, /runPeerExchange/u);
+  assert.match(benchmarkGuide, /pnpm test:browser/u);
 });
