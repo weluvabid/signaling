@@ -1,20 +1,16 @@
 # SEE Protocol Specification
 
 **Protocol name:** Signaling Exchange Envelope (SEE)
-**Envelope wire version:** 1 (proposed)
-**Fragment wire version:** 1 (proposed)
+**Envelope wire version:** 1
+**Fragment wire version:** 1
 
-This document defines the proposed binary envelope and transfer-fragment format. It is transport-independent. QR, file, and clipboard adapters carry bytes defined here; they do not change envelope semantics.
+This document specifies the binary envelope and transfer-fragment formats. The format is transport-independent. QR, file, and clipboard adapters carry bytes defined here; they do not change envelope semantics.
 
 The terms **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** are normative.
 
 ## 1. Goals and non-goals
 
-SEE provides a bounded, versioned container for exchanging application signaling messages without requiring a centralized signaling service.
-
-SEE does not establish network connections, discover peers, provide NAT traversal, authenticate a human identity, encrypt payloads, or guarantee that a direct network path exists.
-
-The first application adapter is WebRTC. The core envelope remains usable for other application-defined signaling payloads.
+SEE provides a bounded, versioned container for exchanging application signaling messages without requiring a centralized signaling service. The WebRTC adapter maps session descriptions and ICE candidates; the core envelope also carries application-defined signaling payloads. Connection setup, peer discovery, NAT traversal, identity, encryption, and network-path selection remain with the consuming application and its WebRTC configuration.
 
 ## 2. Encoding profile
 
@@ -31,7 +27,7 @@ Implementations MUST:
 - Reject tags, floats, undefined, negative integers, and data types not explicitly used by the SEE schema.
 - Enforce byte, nesting, and collection limits before materializing unbounded structures.
 
-The implementation MUST use a maintained CBOR library. SEE MUST NOT ship a bespoke CBOR parser or encoder. The current encoder/decoder candidate is `cborg@6.1.3` (Apache-2.0). It supports RFC 8949 deterministic encoding, strict integer decoding, indefinite-length rejection, duplicate-key rejection, and `Map` decoding.
+The implementation uses `cborg@6.1.3` (Apache-2.0) for CBOR encoding and decoding. It supports RFC 8949 deterministic encoding, strict integer decoding, indefinite-length rejection, duplicate-key rejection, and `Map` decoding.
 
 `cborg` exposes a custom tokenizer interface. SEE wraps that tokenizer and counts CBOR tokens and array/map child items, rejecting excessive depth, collection lengths, and total item counts before the decoder materializes those structures.
 
@@ -44,7 +40,7 @@ The top-level value is a CBOR map.
 | Key | Field           | CBOR type        | Required | Meaning                                            |
 | --: | --------------- | ---------------- | -------- | -------------------------------------------------- |
 |   0 | magic           | text             | yes      | Exact value `SEE`                                  |
-|   1 | version         | unsigned integer | yes      | `1` for this draft                                 |
+|   1 | version         | unsigned integer | yes      | `1` for SEE v1                                 |
 |   2 | session_id      | byte string      | yes      | 16 cryptographically random bytes                  |
 |   3 | message_id      | byte string      | yes      | 16 cryptographically random bytes                  |
 |   4 | kind            | unsigned integer | yes      | Message kind enum                                  |
@@ -97,9 +93,9 @@ Compression identifiers:
 
 V1 MUST support identifier 0. Implementations SHOULD support identifier 1 using the interoperable zlib-wrapped DEFLATE format. A decoder MUST reject unknown compression identifiers.
 
-The implementation uses the Compression Streams API's `deflate` format in supported modern browsers and Node.js runtimes. Decompression MUST be streamed and MUST stop as soon as the advertised `original_length` or configured maximum is exceeded. The final decompressed length MUST equal `original_length`.
+The implementation uses the Compression Streams API's `deflate` format. Decompression is streamed and stops when the advertised `original_length` or configured maximum is exceeded. The final decompressed length must equal `original_length`.
 
-The encoder SHOULD retain compressed data only when the complete encoded envelope is smaller than the uncompressed representation. Compression is optional; callers may request an attempt, but the encoder may retain the uncompressed payload if compression is not beneficial.
+When DEFLATE is requested, the encoder skips the compression probe for payloads below 4 KiB. For larger payloads, it compresses a 1 KiB prefix and proceeds with full compression when the prefix saves at least 10%. It retains compressed data only when the complete encoded envelope is smaller than the uncompressed representation.
 
 ### 3.5 WebRTC content types
 
@@ -110,7 +106,7 @@ The WebRTC adapter encodes its payload as deterministic CBOR maps. It does not p
 
 An empty candidate string or a `null` candidate supplied to the adapter sets `endOfCandidates`; it is not retained as an ordinary candidate entry. The consuming application remains responsible for applying candidates and the end-of-candidates marker to its `RTCPeerConnection`.
 
-The adapter supports complete offer/answer exchange and candidate batches. It does not create offers, mutate peer connection state, or select trickle versus non-trickle policy.
+The adapter supports complete offer/answer exchange and candidate batches. The consuming application creates offers, manages peer connection state, and selects trickle or non-trickle policy.
 
 ## 4. Integrity
 
@@ -127,7 +123,7 @@ The digest preimage is the deterministic CBOR encoding of the envelope map conta
 
 The receiver MUST validate the digest before decompressing or exposing payload bytes.
 
-The digest covers the compressed `data` bytes and all envelope metadata. SHA-256 here detects accidental corruption and binds envelope fields together. It does **not** authenticate the sender, provide confidentiality, or prevent replay. An attacker can replace the payload and its digest.
+The digest covers the compressed `data` bytes and all envelope metadata. SHA-256 detects accidental corruption and binds envelope fields together. Sender authentication, confidentiality, and replay policy are application-level concerns.
 
 ## 5. Transfer fragmentation
 
@@ -174,7 +170,7 @@ The implementation's current defaults and protocol hard ceilings are:
 | Message lifetime                     |  24 hours |       7 days |
 | Clock skew tolerance                 | 5 minutes |   10 minutes |
 
-The QR adapter limits fragment data to 850 bytes regardless of a larger general fragment limit.
+The QR adapter limits fragment data to 850 bytes regardless of a larger general fragment limit. QR encoding defaults to error-correction level M, scale 6, and margin 4. Image decoding defaults to a 4-million-pixel limit and a 500 ms retry budget.
 
 The implementation wraps `cborg`’s tokenizer to enforce nesting-depth, collection-entry, and total-item limits before array/map materialization.
 
@@ -190,7 +186,7 @@ A transfer moves through collecting and verifying states internally. It becomes 
 
 - **File:** raw serialized envelope bytes in an `application/vnd.see.envelope` Blob/File. File transport does not add a second wrapper.
 - **Clipboard:** `SEE1:` followed by unpadded base64url of the complete serialized envelope. The clipboard adapter accepts an injected clipboard port and does not access browser globals implicitly.
-- **QR:** each serialized fragment is represented as `SEF1:` followed by unpadded base64url of the fragment CBOR bytes, then encoded as an SVG-backed QR image. The current default error-correction level is M with a four-module quiet-zone margin. QR frame output is an SVG data URL. QR image decode is browser-only, accepts an already loaded image element, and uses the optional `qr` package over a bounded canvas readback. The retry budget limits optional decode retries, not mandatory synchronous work.
+- **QR:** each serialized fragment is represented as `SEF1:` followed by unpadded base64url of the fragment CBOR bytes, then encoded as an SVG-backed QR image. The current default error-correction level is M with a four-module quiet-zone margin. QR frame output is an SVG data URL. QR image decode is browser-only, accepts an already loaded image element, and uses the optional `qr` package over a bounded canvas readback. Image dimensions are limited to 4,096 pixels per side and 4 million pixels by default. The decode retry budget defaults to 500 ms and supports values up to 5,000 ms.
 
 Clipboard carries a whole envelope and does not perform fragmentation. QR uses the fragment protocol.
 
@@ -208,4 +204,4 @@ Wire-format changes that affect interpretation require a new version. Additive p
 
 All imported bytes, images, files, and clipboard content are untrusted. Implementations MUST validate framing and limits before expensive decoding, decompression, or allocation. Error messages MUST NOT include raw signaling payloads or secrets by default.
 
-SEE v1 provides no sender authentication or confidentiality. Applications requiring authenticated signaling MUST add a separately specified authenticated profile with a key-establishment and identity model before trusting peer identity or applying sensitive negotiation state.
+The envelope digest provides integrity verification. Applications define sender authentication, confidentiality, and replay policy according to their peer identity and key-management model.

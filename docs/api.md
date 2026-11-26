@@ -2,63 +2,89 @@
 
 ## Core envelope
 
-`encodeEnvelope(input, options?)` accepts:
+`encodeEnvelope(input, options?)` accepts an `EnvelopeInput`:
 
 - `kind`: `offer`, `answer`, `candidate`, or `custom`.
-- `contentType`: non-empty media type or reverse-DNS identifier, at most 128 UTF-8 bytes.
+- `contentType`: non-empty UTF-8 media type or reverse-DNS identifier, up to 128 bytes.
 - `payload`: caller-owned `Uint8Array`; the encoder snapshots it before asynchronous work.
-- `sessionId` / `messageId`: optional 16-byte IDs. Omitted IDs are generated with Web Crypto.
-- `createdAt` / `expiresAt`: Unix milliseconds. Expiration must follow creation and stay within the configured maximum lifetime.
-- `inReplyTo`: optional 16-byte message ID.
-- `compression`: optional `none` or `deflate`. Deflate is retained only if the serialized base envelope becomes smaller. If the compressed stream exceeds the original payload length, encoding falls back to uncompressed bytes.
+- `sessionId` and `messageId`: optional 16-byte identifiers generated with Web Crypto when omitted.
+- `createdAt` and `expiresAt`: Unix milliseconds. Expiration follows creation and is bounded by the configured maximum message lifetime.
+- `inReplyTo`: optional 16-byte message identifier.
+- `compression`: `none` or `deflate`.
 
-`decodeEnvelope(bytes, options?)` validates the envelope schema, rejects unknown fields and non-deterministic CBOR, verifies SHA-256 before decompression, enforces payload limits, and returns copied metadata/payload buffers. `allowExpired` only bypasses expiration rejection; it does not bypass timestamp sanity checks or integrity verification.
+The DEFLATE heuristic skips payloads below 4 KiB. For larger payloads it compresses a 1 KiB prefix and continues with full compression when the prefix saves at least 10%. The complete compressed and uncompressed envelope encodings are compared; compression is retained only when the compressed envelope is smaller.
 
-All public failures are `SignalingError` instances with a stable `code`, safe `details`, and a preserved `cause` where an underlying operation failed.
+`decodeEnvelope(bytes, options?)` validates the envelope schema, rejects unknown fields and non-deterministic CBOR, verifies SHA-256 before decompression, enforces payload limits, and returns copied metadata and payload buffers. `allowExpired` bypasses expiration rejection while retaining timestamp validation and integrity verification.
 
-## Fragmentation
+Public failures use `SignalingError` with a stable `code`, safe `details`, and a preserved `cause` when an underlying operation fails.
 
-`fragmentEnvelope(envelopeBytes, options?)` produces independently encoded CBOR fragments. The default fragment data size is 16 KiB; the receiver may provide them in any order. The QR adapter uses a smaller 850-byte cap.
+## Fragmentation and reassembly
+
+`fragmentEnvelope(envelopeBytes, options?)` produces deterministic CBOR fragments. The default fragment payload is 16 KiB. The QR adapter uses an 850-byte maximum.
 
 ```ts
 const reassembler = new FragmentReassembler();
 const result = await reassembler.add(fragmentBytes);
 
 if (result.status === 'pending') {
-  // Continue collecting. Duplicate identical frames are idempotent.
+  // Continue collecting fragments.
 } else if (result.status === 'complete') {
-  // result.bytes is a verified copy of the original envelope bytes.
+  // result.bytes contains the verified envelope bytes.
 } else {
-  // status === 'duplicate': this transfer ID was already completed recently.
+  // The transfer ID has already completed.
 }
 ```
 
-`FragmentReassembler` owns its own state. Call `abort(transferId)` to discard one transfer, `expireStale()` to evict old transfers, or `clear()` to release all retained fragment buffers. If digest verification is already in progress, Web Crypto cannot be cancelled; the pending `add()` is invalidated and rejects when the digest operation settles, so its temporary contiguous copy may remain alive briefly. `add()` is asynchronous because the completed transfer digest is verified using Web Crypto. Identical duplicate fragments remain idempotent during verification and return `pending`; a new non-duplicate fragment in that state fails with `TRANSFER_VERIFYING`, while conflicting duplicates reject the transfer.
+`FragmentReassembler` owns its state. Its methods are:
+
+- `add(fragmentBytes)` — accept a fragment and return `pending`, `complete`, or `duplicate`.
+- `abort(transferId)` — discard one transfer.
+- `expireStale()` — expire transfers and completed-transfer entries by TTL.
+- `clear()` — release retained fragment buffers and completed-transfer entries.
+
+The reassembler exposes `activeTransfers`, `inFlightBytes`, and `inFlightFragments` accounting getters. During digest verification, identical duplicates remain idempotent. A new fragment for a verifying transfer returns `TRANSFER_VERIFYING`; conflicting duplicates reject the transfer.
 
 ## File transport
 
-`createEnvelopeBlob(bytes)` creates an `application/vnd.see.envelope` Blob. `readEnvelopeFile(blob)` reads a bounded Blob/File into a new byte array. These functions do not serialize JSON or reinterpret the envelope.
+- `createEnvelopeBlob(bytes, options?)` creates an `application/vnd.see.envelope` Blob.
+- `readEnvelopeFile(blob, options?)` reads a bounded Blob/File into a new `Uint8Array`.
+
+File transport preserves the serialized envelope bytes.
 
 ## Clipboard transport
 
-The clipboard representation is `SEE1:` followed by unpadded base64url of the complete serialized envelope. The adapter accepts a `ClipboardPort` rather than accessing `navigator.clipboard` implicitly. The application must request clipboard permissions and provide the browser clipboard object.
+The clipboard representation is `SEE1:` followed by unpadded base64url of the complete serialized envelope.
+
+- `encodeClipboardText(envelope, options?)`
+- `decodeClipboardText(text, options?)`
+- `writeClipboard(clipboard, envelope, options?)`
+- `readClipboard(clipboard, options?)`
+
+The adapter accepts a `ClipboardPort` with `readText()` and `writeText()` methods.
 
 ## QR transport
 
-`encodeQrFrames(bytes, options?)` fragments an envelope and renders each fragment as an SVG data URL. `decodeQrImage(image)` decodes one QR frame from a loaded `HTMLImageElement` using the optional `qr` peer and a bounded canvas readback. `retryBudgetMs` caps optional retries in the default decoder; it is not a hard wall-clock timeout for mandatory synchronous work. Consumers may inject a different synchronous or asynchronous `decoder` when they need a different quality/performance trade-off. `reassembleQrFrames(images)` is a convenience for a single transfer's image set.
+- `encodeQrFrames(bytes, options?)` fragments an envelope and renders each fragment as an SVG data URL.
+- `decodeQrImage(image, options?)` decodes one QR frame from a loaded `HTMLImageElement`.
+- `reassembleQrFrames(images, options?)` decodes and reassembles a set of images for one transfer.
 
-The application owns file selection, object-URL lifecycle, image loading, and UI. Revoke object URLs after use. The QR adapter checks image dimensions before allocating its canvas, but the browser has already decoded the source image into the `HTMLImageElement`. For hostile image files, keep import UX constrained and consider a separate image-processing boundary. The QR decoder's optional retry effort is capped by a finite retry budget; this does not impose a hard wall-clock limit on mandatory synchronous work.
+Encoding options include error-correction level `L`, `M`, `Q`, or `H`, scale (default `6`), and margin (default `4`). The fragment payload is capped at 850 bytes. Decoding supports a configurable pixel limit, retry budget (default `500` ms, maximum `5,000` ms), and injected decoder.
+
+The default decoder reads image pixels through a bounded canvas. Applications own file selection, object-URL lifecycle, image loading, and UI.
 
 ## WebRTC adapter
 
-`createDescriptionEnvelopeInput(sessionId, description, options?)` maps an offer/answer SDP object into an `EnvelopeInput`. It does not create an offer or set a remote description.
+- `createDescriptionPayload(description)` maps an offer or answer to the WebRTC payload model.
+- `parseDescriptionPayload(payload, options?)` decodes a description payload.
+- `createDescriptionEnvelopeInput(sessionId, description, options?)` creates an envelope input for an offer or answer.
+- `createCandidatesPayload(candidates)` maps ICE candidates and the end-of-candidates marker.
+- `parseCandidatesPayload(payload, options?)` decodes an ICE candidate payload.
+- `createCandidatesEnvelopeInput(sessionId, candidates, options?)` creates an envelope input for a candidate batch.
+- `decodeWebRtcPayload(envelope, options?)` validates the WebRTC content type and message kind, then returns the decoded description or candidate payload.
+- `waitForIceGatheringComplete(peerConnection, options?)` resolves when ICE gathering reaches `complete`; it supports `AbortSignal` and a timeout (default `30,000` ms, maximum `600,000` ms).
 
-`createCandidatesEnvelopeInput(sessionId, candidates, options?)` maps a batch of ICE candidates. A `null` candidate or empty candidate string marks end-of-candidates.
-
-`decodeWebRtcPayload(envelope, options?)` validates the content type and message kind and returns the parsed description/candidate payload. These WebRTC payloads are deterministic CBOR maps, so the same bounded CBOR tokenizer/resource limits apply inside the payload. The consuming application applies it to its own `RTCPeerConnection` and validates the negotiation state before doing so.
-
-`waitForIceGatheringComplete(peerConnection, options?)` only observes `icegatheringstatechange`; it does not mutate the connection. It supports an `AbortSignal` and finite timeout.
+Description payloads support complete `offer` and `answer` SDP, with a 2 MiB SDP limit. Candidate payloads contain up to 64 candidates; candidate lines are limited to 4,096 characters and candidate metadata strings to 256 characters. A `null` candidate or empty candidate string sets `endOfCandidates`.
 
 ## Ownership and mutation
 
-Input byte arrays are copied before being retained or returned across async boundaries. Fragment/reassembly objects own their internal buffers. No global transfer registry is used. Returned byte arrays are mutable copies; callers may mutate them without affecting the reassembler or the source envelope.
+Input byte arrays are copied before retention across asynchronous boundaries. Fragment and reassembly objects own their internal buffers. No global transfer registry is used. Returned byte arrays are mutable copies and can be changed without affecting retained reassembler state or source envelope bytes.

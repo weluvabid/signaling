@@ -1,14 +1,8 @@
 # Architecture
 
-## 1. Boundary
+## 1. Components
 
-Signaling Exchange is a library, not a peer-to-peer application or signaling service.
-
-The core transforms application signaling payloads into versioned envelopes and back. Transfer framing reconstructs envelope bytes from fragments. Adapters translate between bytes and external representations.
-
-The consumer owns connection lifecycle, peer state, transport delivery, and network connectivity policy.
-
-## 2. Layers
+SEE separates protocol encoding, transfer framing, and transport representations.
 
 ```text
 Consumer application
@@ -24,77 +18,53 @@ Protocol core
 Transfer engine
   - fragmentation
   - bounded reassembly
-  - cancellation / expiration
+  - cancellation and expiration
         |
 Transport adapters
   - file
   - clipboard
   - QR
         |
-Optional protocol adapter
-  - WebRTC description / ICE payload mapping
+WebRTC adapter
+  - description mapping
+  - ICE candidate mapping
+  - ICE gathering observer
 ```
 
-The dependency direction is inward. Core modules MUST NOT import transport, DOM, camera, filesystem, clipboard, or WebRTC APIs.
+The dependency direction is inward. Core modules are independent of transport adapters, DOM APIs, filesystem APIs, clipboard APIs, and WebRTC APIs.
 
-## 3. Package entry points
+## 2. Package entry points
 
 The package exposes independent ESM entry points:
 
-- `@weluvabid/signaling` — core envelope, fragmentation, reassembly, limits, and typed errors.
+- `@weluvabid/signaling` — envelope, fragmentation, reassembly, limits, and typed errors.
 - `@weluvabid/signaling/file` — Blob/File import and export.
-- `@weluvabid/signaling/clipboard` — injected clipboard-port adapter.
-- `@weluvabid/signaling/qr` — QR image encode/decode adapter; requires optional peer `qr`.
-- `@weluvabid/signaling/webrtc` — WebRTC SDP/ICE payload mapping and ICE gathering observer.
+- `@weluvabid/signaling/clipboard` — clipboard adapter using an injected `ClipboardPort`.
+- `@weluvabid/signaling/qr` — QR frame encoding and image decoding using the optional `qr` peer dependency.
+- `@weluvabid/signaling/webrtc` — WebRTC description and ICE payload mapping, plus an ICE gathering observer.
 
-The QR dependency is an optional peer so consumers of the core entry point do not load QR code. The QR subpath is expected to fail with a module-resolution error if the consumer imports it without installing `qr`; this is documented behavior.
+The QR dependency is an optional peer. Consumers of the core entry point do not load QR functionality.
 
-## 4. Runtime strategy
+## 3. Runtime strategy
 
-The core targets modern browser runtimes and supported Node.js LTS releases.
+The core uses Web Crypto for secure identifiers and SHA-256. Compression uses the standard Compression Streams API with the `deflate` format. Runtime requirements are Web Crypto, `Blob`, and stream support for the operations that use them.
 
-Core code MUST avoid:
+The core contains no Node-only built-ins, implicit filesystem access, implicit network access, or global mutable transfer registry. QR image decoding runs in a browser and accepts an already loaded `HTMLImageElement`.
 
-- `window`, `document`, `navigator`, DOM element/UI APIs, and DOM-specific element types.
-- Node-only built-ins.
-- Implicit filesystem or network access.
-- Global mutable singleton state.
+## 4. Ownership and concurrency
 
-The core uses Web Crypto for secure identifiers and SHA-256. Compression uses the standard Compression Streams API when requested. Unsupported runtime capabilities fail explicitly; there is no insecure cryptographic fallback.
+Each `FragmentReassembler` instance owns its transfer state. Transfers are isolated by transfer ID and bounded by per-transfer and aggregate resource limits.
 
-The QR adapter is browser-only for image decoding. It accepts an already loaded `HTMLImageElement`; applications own file selection, object URLs, image loading, and UI.
+Input byte arrays are copied before they are retained across asynchronous work. The reassembler owns fragment buffers and releases them on completion, failure, expiration, abort, and clear. Completed transfer IDs are retained in a bounded cache to prevent duplicate completion events.
 
-## 5. Ownership and concurrency
+## 5. Error handling
 
-All stateful reassembly state belongs to an explicitly created `FragmentReassembler` instance. No module-global transfer registry is used.
+Public failures use `SignalingError` with a stable error code, safe details, and the original cause where an underlying operation failed. Malformed input, unsupported states, invalid transitions, and resource-limit violations produce explicit errors.
 
-Input buffers are copied before they are retained across asynchronous work. Reassembly owns fragment buffers and releases them on completion, failure, expiration, abort, and clear. Concurrent transfers are isolated by transfer ID and bounded by resource limits.
+## 6. Dependencies
 
-## 6. Error handling
+SEE uses maintained libraries for CBOR serialization and QR encoding/decoding. The project also uses property-based testing and browser tooling for validation and measurement.
 
-Public operations return typed results or throw `SignalingError` consistently, except APIs that intentionally expose platform cancellation semantics through a typed wrapper preserving the original cause.
+## 7. Build and exports
 
-Unexpected failures preserve their causes. Malformed input, unsupported states, invalid transitions, and resource-limit violations do not fall back silently. Diagnostics identify the failing operation and non-sensitive metadata without logging payload contents.
-
-## 7. Dependency policy
-
-Use maintained dependencies for:
-
-- CBOR serialization.
-- QR encoding and decoding.
-- Specialist image processing.
-- Property-based testing and benchmarking where useful.
-
-Do not implement cryptographic primitives, CBOR, QR detection, Reed-Solomon coding, or compression algorithms from scratch.
-
-## 8. Build and exports
-
-The package publishes ESM first. CommonJS support is not a V1 requirement.
-
-Package exports point only to generated `dist` artifacts and include TypeScript declarations. The package tarball is restricted to `dist`, documentation, README, and license. A package verification script checks that all export targets exist after build.
-
-## 9. Reference consumer
-
-Pairwise is the first integration target, not a dependency of this repository.
-
-Pairwise remains responsible for `RTCPeerConnection`, SDP/ICE lifecycle, DataChannels, UI, STUN/TURN policy, and connection state. SEE provides encoding, exchange, validation, and reconstruction.
+The package publishes ESM entry points with TypeScript declarations. Export targets point to generated `dist` artifacts. The package file list includes `dist`, documentation, README, license, and security information; `scripts/verify-package.mjs` checks the package contents and export targets.
