@@ -19,6 +19,8 @@ test('QR frames round-trip through generated SVG images', async ({ page }) => {
     return {
       frameCount: frames.length,
       imageCount: images.length,
+      imageWidth: images[0]?.naturalWidth,
+      imageHeight: images[0]?.naturalHeight,
       equal: window.SEE.equalBytes(envelope, reconstructed),
       payloadEqual: window.SEE.equalBytes(payload, decoded.payload),
     };
@@ -26,6 +28,8 @@ test('QR frames round-trip through generated SVG images', async ({ page }) => {
 
   expect(result.frameCount).toBeGreaterThan(1);
   expect(result.imageCount).toBe(result.frameCount);
+  expect(result.imageWidth).toBeGreaterThan(150);
+  expect(result.imageHeight).toBeGreaterThan(150);
   expect(result.equal).toBe(true);
   expect(result.payloadEqual).toBe(true);
 });

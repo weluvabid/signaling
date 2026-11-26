@@ -40,6 +40,25 @@ const ECC_LEVELS = {
   H: 'high',
 } as const;
 
+function addIntrinsicSvgDimensions(svg: string): string {
+  const root = svg.match(/<svg\b([^>]*)>/i);
+  const viewBox = root?.[1]?.match(/\bviewBox=["']\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*["']/i);
+  if (!root || !viewBox) {
+    fail('TRANSPORT_ERROR', 'QR encoder returned an SVG without a valid viewBox');
+  }
+  const width = Number(viewBox[1]);
+  const height = Number(viewBox[2]);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width < 1 || height < 1) {
+    fail('TRANSPORT_ERROR', 'QR encoder returned invalid SVG dimensions');
+  }
+  const attributes = root[1]!;
+  const additions = [
+    /\bwidth\s*=/.test(attributes) ? '' : ` width="${width}"`,
+    /\bheight\s*=/.test(attributes) ? '' : ` height="${height}"`,
+  ].join('');
+  return additions ? svg.replace(root[0], `<svg${attributes}${additions}>`) : svg;
+}
+
 export async function encodeQrFrames(
   envelope: Uint8Array,
   options: QrEncodeOptions = {},
@@ -84,10 +103,14 @@ export async function encodeQrFrames(
       if (typeof svg !== 'string' || !svg.includes('<svg')) {
         fail('TRANSPORT_ERROR', 'QR encoder returned an invalid SVG image');
       }
+      // SVGs without explicit dimensions are rendered at the browser's default
+      // replaced-element size (often 150x150), regardless of their viewBox.
+      // That downsamples QR modules below the decoder's reliable sampling size.
+      const sizedSvg = addIntrinsicSvgDimensions(svg);
       frames.push({
         index,
         count: fragments.length,
-        dataUrl: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
+        dataUrl: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(sizedSvg)}`,
       });
     } catch (cause) {
       throw wrapError('TRANSPORT_ERROR', 'QR encoder failed to render a transfer frame', cause);
@@ -154,6 +177,11 @@ export async function decodeQrImage(
     if (!context) {
       fail('UNSUPPORTED_RUNTIME', 'Canvas 2D context is unavailable for QR decoding');
     }
+    // SVG QR images have a transparent quiet zone. Canvas readback exposes
+    // transparent pixels as RGBA(0, 0, 0, 0); decoders that inspect RGB values
+    // then mistake the quiet zone for black modules. Composite onto white first.
+    context.fillStyle = '#fff';
+    context.fillRect(0, 0, width, height);
     context.drawImage(image, 0, 0, width, height);
     const imageData = context.getImageData(0, 0, width, height);
     text = options.decoder
