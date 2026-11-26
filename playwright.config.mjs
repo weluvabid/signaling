@@ -1,25 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
-import { createServer } from 'node:net';
 
-// Reserve an ephemeral loopback port so browser tests never attach to a
-// developer's Vite server (or another stale test server).
-const portProbe = createServer();
-await new Promise((resolve, reject) => {
-  portProbe.once('error', reject);
-  portProbe.listen(0, '127.0.0.1', resolve);
-});
-const address = portProbe.address();
-if (!address || typeof address === 'string') {
-  throw new Error('Unable to allocate a Playwright server port');
-}
-
-// A single stable port is shared by the runner and every worker. Keep it
-// separate from the usual Vite development port (4173).
+// Keep the test server isolated from the development server on port 4173.
+// Playwright starts one fresh server shared by the runner and all workers.
 const webServerPort = 4174;
 const baseURL = `http://127.0.0.1:${webServerPort}`;
-await new Promise((resolve, reject) => {
-  portProbe.close((error) => (error ? reject(error) : resolve()));
-});
 
 const browserProjects = [
   { name: 'chromium', use: { ...devices['Desktop Chrome'] } },

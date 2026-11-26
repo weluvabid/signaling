@@ -60,6 +60,9 @@ test('browser interoperability harness and benchmark methodology are documented'
   assert.match(playwrightConfig, /chromium/u);
   assert.match(playwrightConfig, /firefox/u);
   assert.match(playwrightConfig, /webkit/u);
+  assert.match(playwrightConfig, /const webServerPort = 4174/u);
+  assert.match(playwrightConfig, /--strictPort/u);
+  assert.match(playwrightConfig, /reuseExistingServer: false/u);
   assert.match(browserSuite, /runPeerExchange/u);
   assert.match(benchmarkGuide, /pnpm test:browser/u);
 });
