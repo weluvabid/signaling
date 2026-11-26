@@ -6,11 +6,9 @@
 
 This document specifies the binary envelope and transfer-fragment formats. The format is transport-independent. QR, file, and clipboard adapters carry bytes defined here; they do not change envelope semantics.
 
-The terms **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** are normative.
-
 ## 1. Goals and non-goals
 
-SEE provides a bounded, versioned container for exchanging application signaling messages without requiring a centralized signaling service. The WebRTC adapter maps session descriptions and ICE candidates; the core envelope also carries application-defined signaling payloads. Connection setup, peer discovery, NAT traversal, identity, encryption, and network-path selection remain with the consuming application and its WebRTC configuration.
+SEE provides a bounded, versioned container for exchanging application data across different transports. The WebRTC adapter maps session descriptions and ICE candidates, while the `custom` message kind carries application-defined payloads. The envelope is independent of the channel used to deliver it.
 
 ## 2. Encoding profile
 
@@ -60,9 +58,9 @@ The top-level value is a CBOR map.
 |     0 | offer     | Initiates a negotiation                       |
 |     1 | answer    | Responds to an offer                          |
 |     2 | candidate | Carries incremental ICE candidate information |
-|     3 | custom    | Application-defined signaling message         |
+|     3 | custom    | Application-defined payload                    |
 
-A message kind does not authorize an application state transition. Consumers MUST validate negotiation state before applying a message.
+A message kind describes the payload category. Consumers MUST validate application state before applying a message.
 
 ### 3.2 Identifiers
 
@@ -202,6 +200,6 @@ Wire-format changes that affect interpretation require a new version. Additive p
 
 ## 9. Security considerations
 
-All imported bytes, images, files, and clipboard content are untrusted. Implementations MUST validate framing and limits before expensive decoding, decompression, or allocation. Error messages MUST NOT include raw signaling payloads or secrets by default.
+All imported bytes, images, files, and clipboard content are untrusted. Implementations MUST validate framing and limits before expensive decoding, decompression, or allocation. Error messages MUST NOT include raw payloads or secrets by default.
 
 The envelope digest provides integrity verification. Applications define sender authentication, confidentiality, and replay policy according to their peer identity and key-management model.

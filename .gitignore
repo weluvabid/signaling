@@ -37,3 +37,4 @@ blob-report/
 # Generated benchmark runs and archives
 benchmarks/results/*/
 benchmarks/results/*.zip
+!benchmarks/results/see-run-4.zip

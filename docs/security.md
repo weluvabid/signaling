@@ -2,9 +2,7 @@
 
 ## 1. Protected data
 
-SEE handles SDP and ICE information, application-defined signaling payloads, session and message identifiers, serialized payload bytes, incomplete fragment buffers, and imported QR images and files.
-
-Signaling payloads can contain network addresses, device capabilities, and connection metadata. Applications should handle them as sensitive data.
+SEE handles application payloads, session and message identifiers, serialized payload bytes, incomplete fragment buffers, and imported QR images and files. WebRTC payloads can contain network addresses, device capabilities and connection metadata. Other application payloads may contain operational, diagnostic or measurement data; applications should handle them according to their content.
 
 ## 2. Input validation
 

@@ -69,3 +69,24 @@ test('browser compatibility is tested without browser performance benchmarks', a
   assert.doesNotMatch(benchmarkGuide, /browser timing|browser benchmark|browser performance comparison/iu);
   assert.equal('benchmark:browser' in packageJson.scripts, false);
 });
+
+
+test('project documentation records SEE origin, applications, and the latest benchmark artifact', async () => {
+  const [readme, overview, applications, benchmarks, gitignore] = await Promise.all([
+    readFile(new URL('../README.md', import.meta.url), 'utf8'),
+    readFile(new URL('../docs/overview.md', import.meta.url), 'utf8'),
+    readFile(new URL('../docs/applications.md', import.meta.url), 'utf8'),
+    readFile(new URL('../docs/benchmarks.md', import.meta.url), 'utf8'),
+    readFile(new URL('../.gitignore', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(readme, /started with a small problem/u);
+  assert.match(overview, /Application-defined data/u);
+  assert.match(applications, /Vehicle Signal Workbench \(VSW\)/u);
+  assert.match(applications, /Robotics and autonomous systems/u);
+  assert.match(applications, /Scientific instrumentation/u);
+  assert.match(applications, /Edge diagnostics and observability/u);
+  assert.match(benchmarks, /see-run-4\.zip/u);
+  assert.match(benchmarks, /fixture-derived stress payloads/u);
+  assert.match(gitignore, /!benchmarks\/results\/see-run-4\.zip/u);
+});

@@ -2,7 +2,7 @@
   "name": "@weluvabid/signaling",
   "version": "0.1.0",
   "private": true,
-  "description": "Transport-agnostic, serverless signaling exchange for peer-to-peer applications.",
+  "description": "A transport-independent library for encoding, compressing, fragmenting and exchanging structured application data",
   "type": "module",
   "sideEffects": false,
   "files": [
@@ -92,11 +92,15 @@
     "url": "https://github.com/weluvabid/signaling/issues"
   },
   "keywords": [
-    "webrtc",
-    "peer-to-peer",
-    "signaling",
+    "data-exchange",
+    "binary-envelope",
     "cbor",
+    "compression",
+    "fragmentation",
+    "reassembly",
+    "integrity",
     "qr-code",
-    "serverless"
+    "webrtc",
+    "telemetry"
   ]
 }

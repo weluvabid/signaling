@@ -2,43 +2,45 @@
 
 ## In one sentence
 
-**Signaling Exchange (SEE) packages connection information into a portable message that applications can exchange through files, clipboard text, or QR images.**
+**SEE encodes, compresses, validates and transfers application data through portable, transport-independent envelopes.**
 
-## Purpose
+## Origin and evolution
 
-Before two devices establish a peer-to-peer connection, they exchange connection information. In WebRTC, this commonly includes an offer or answer and ICE candidate information.
+SEE began as a way to make WebRTC signaling easier to exchange. Offers, answers and ICE candidates commonly appear as large JSON or text payloads. I wanted to replace manual copy-and-paste with friendlier exchanges through QR images, clipboard text and files.
 
-SEE provides a versioned exchange format and transport adapters for moving that information between people or devices. The same envelope can be transferred as a file, clipboard text, or a sequence of QR frames.
+The first implementation focused on that workflow. Solving its constraints led to a deterministic binary envelope, compression, fragmentation, bounded reassembly and integrity verification. The envelope then became independent of WebRTC and gained support for application-defined payloads.
+
+The binary wire container is the **Signaling Exchange Envelope**. SEE is the library built around it.
 
 ## How it works
 
 1. **Package:** application data is encoded into a versioned envelope.
 2. **Integrity:** the envelope includes a SHA-256 digest covering its metadata and payload bytes.
-3. **Compress:** DEFLATE is selected when the compression heuristic identifies a useful prefix and the complete encoded envelope is smaller.
+3. **Compress:** DEFLATE is retained when it makes the complete encoded envelope smaller.
 4. **Fragment:** envelopes are split into numbered fragments sized for the selected transport.
-5. **Exchange:** file, clipboard, or QR adapters represent the envelope or its fragments.
-6. **Reassemble:** the receiver collects fragments in any order, handles identical duplicates, and verifies the reconstructed transfer digest.
-7. **Decode:** the receiver validates the envelope and returns its signaling payload and metadata.
+5. **Exchange:** file, clipboard or QR adapters represent the envelope or its fragments.
+6. **Reassemble:** the receiver collects fragments in any order, handles identical duplicates and verifies the reconstructed transfer digest.
+7. **Decode:** the receiver validates the envelope and returns its payload and metadata.
 
-## Example exchange
+## Original WebRTC exchange
 
-One device creates a WebRTC offer. SEE packages the offer, splits the envelope into QR frames, and lets another device scan them. The receiving device reconstructs and decodes the offer, then applies it during its WebRTC negotiation. The answer can travel back through the same exchange format.
+One device creates a WebRTC offer. SEE packages the offer, splits the envelope into QR frames, and lets another device scan them. The receiving device reconstructs and decodes the offer, then applies it during WebRTC negotiation. The answer can travel back through the same exchange format.
 
-The same envelope can be transferred through a file or clipboard instead of QR.
+The same envelope can be transferred through a file or clipboard instead of QR. The WebRTC adapter maps complete offer/answer descriptions and ICE candidate batches.
+
+## Application-defined data
+
+The `custom` message kind carries application-defined bytes with a caller-supplied content type. This allows applications to use SEE's envelope, compression, integrity, fragmentation and reassembly without adopting the WebRTC payload model.
 
 ## Responsibilities
 
 | SEE | Consuming application |
 | --- | --- |
-| Encode and decode exchange envelopes | Create and manage `RTCPeerConnection` |
-| Compress payloads and verify integrity | Apply remote descriptions and manage offer/answer state |
-| Fragment and reassemble envelopes | Choose ICE, STUN, and TURN policy |
-| Provide file, clipboard, QR, and WebRTC adapters | Authenticate peers and authorize exchanges |
-| Enforce configurable resource limits | Manage peer state and transport delivery |
-
-## Audience
-
-SEE is for developers building peer-to-peer applications that exchange setup information through different channels.
+| Encode and decode exchange envelopes | Define the application payload schema |
+| Compress payloads and verify integrity | Manage application state and interpretation |
+| Fragment and reassemble envelopes | Select and operate the delivery channel |
+| Provide file, clipboard, QR and WebRTC adapters | Authenticate peers and authorize exchanges |
+| Enforce configurable resource limits | Manage durable storage, retries and replay policy |
 
 ## Further reading
 
@@ -47,4 +49,4 @@ SEE is for developers building peer-to-peer applications that exchange setup inf
 - [API guide](api.md)
 - [Security](security.md)
 - [Benchmarks](benchmarks.md)
-- [Glossary](glossary.md)
+- [Applications and future directions](applications.md)

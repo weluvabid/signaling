@@ -1,8 +1,14 @@
-# Signaling Exchange
+# SEE — Signaling Exchange
 
-A transport-agnostic signaling exchange library for peer-to-peer applications.
+SEE is a TypeScript library for encoding, compressing, validating, fragmenting and reconstructing application data across different exchange channels.
 
-Signaling Exchange (SEE) packages application signaling messages into versioned, integrity-checked envelopes, fragments envelopes for constrained transports, and reconstructs them at the receiving side. Its WebRTC adapter maps session descriptions and ICE candidates into the exchange format. File, clipboard, and QR adapters provide transport representations.
+## Origin
+
+SEE started with a small problem: WebRTC offers, answers and ICE candidates are commonly represented as large JSON or text payloads. I wanted a friendlier way to exchange that information between devices using QR images, clipboard text and files, instead of asking people to copy and paste unwieldy payloads.
+
+That led to a versioned binary envelope, deterministic CBOR encoding, compression, fragmentation and reassembly. As those pieces took shape, the envelope became transport-independent and the payload model expanded beyond WebRTC signaling.
+
+The binary wire container is the **Signaling Exchange Envelope**. SEE is the library built around it.
 
 ## Capabilities
 
@@ -10,18 +16,17 @@ Signaling Exchange (SEE) packages application signaling messages into versioned,
 - SHA-256 integrity verification.
 - Optional zlib-wrapped DEFLATE compression with a prefix-probe heuristic.
 - Bounded fragmentation and out-of-order reassembly.
-- File, clipboard, and QR image transports.
-- WebRTC offer, answer, and ICE-candidate payload mapping.
+- File, clipboard and QR image transports.
+- WebRTC offer, answer and ICE-candidate payload mapping.
+- Application-defined binary payloads through the `custom` message kind.
 - Configurable resource limits with protocol hard ceilings.
 - Typed errors and explicit buffer ownership.
-
-The consuming application owns `RTCPeerConnection` creation and lifecycle, negotiation state, ICE policy, peer identity, authorization, and transport delivery. STUN and TURN remain available for network address discovery and relay connectivity.
 
 ## Package entry points
 
 | Entry point | Purpose | Runtime requirements |
 | --- | --- | --- |
-| `@weluvabid/signaling` | Envelope, fragmentation, reassembly, limits, and errors | Web Crypto; Compression Streams when compression is used |
+| `@weluvabid/signaling` | Envelope, fragmentation, reassembly, limits and errors | Web Crypto; Compression Streams when compression is used |
 | `@weluvabid/signaling/file` | Blob/File import and export | `Blob` and `Blob.arrayBuffer()` |
 | `@weluvabid/signaling/clipboard` | Versioned base64url clipboard representation | Consumer-supplied `ClipboardPort` |
 | `@weluvabid/signaling/qr` | QR frame encoding and image decoding | Optional `qr` peer dependency; browser image element for decoding |
@@ -43,10 +48,12 @@ import {
   FragmentReassembler,
 } from '@weluvabid/signaling';
 
+const telemetryChunk = new Uint8Array([0x01, 0x02, 0x03]);
+
 const envelopeBytes = await encodeEnvelope({
   kind: 'custom',
-  contentType: 'application/vnd.example.signal+json',
-  payload: new TextEncoder().encode(JSON.stringify({ action: 'hello' })),
+  contentType: 'application/vnd.example.telemetry-chunk',
+  payload: telemetryChunk,
   expiresAt: Date.now() + 10 * 60_000,
   compression: 'deflate',
 });
@@ -63,7 +70,7 @@ for (const frame of frames) {
 if (!completeEnvelope) throw new Error('Transfer is incomplete');
 
 const message = await decodeEnvelope(completeEnvelope);
-console.log(message.kind, new TextDecoder().decode(message.payload));
+console.log(message.contentType, message.payload.byteLength);
 ```
 
 For WebRTC, create the offer or answer with the application's `RTCPeerConnection`, optionally wait for ICE gathering to complete, and map the resulting description with the WebRTC adapter. The receiving application applies the decoded description to its own peer connection.
@@ -98,6 +105,7 @@ The general fragmenter defaults to 16 KiB payloads. The QR adapter caps fragment
 - [Protocol specification](docs/protocol.md)
 - [Security model](docs/security.md)
 - [Benchmarks](docs/benchmarks.md)
+- [Applications and future directions](docs/applications.md)
 - [Glossary](docs/glossary.md)
 
 ## Development
