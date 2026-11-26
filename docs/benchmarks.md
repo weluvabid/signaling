@@ -125,7 +125,10 @@ Important fields:
 
 ## Browser tests and benchmarks
 
-Playwright runs the compiled package in Chromium, Firefox, and WebKit. The browser suite covers envelope encoding and decoding, file import, clipboard exchange, QR frame generation and reconstruction, image limits, and WebRTC offer/answer exchange between independent peers.
+Playwright runs the compiled package in Chromium, Firefox, and WebKit. The browser
+suite covers envelope encoding and decoding, file import, clipboard exchange, QR
+frame generation and reconstruction, image limits, and WebRTC offer/answer exchange
+between independent peers.
 
 Install the browser binaries and run the suite:
 
@@ -134,18 +137,64 @@ pnpm browsers:install
 pnpm test:browser
 ```
 
-The browser benchmark runner measures envelope encoding and decoding, DEFLATE-requested encoding with decode verification, fragmentation, reassembly, QR frame generation, image loading, QR decoding, and end-to-end reconstruction.
+Run the browser benchmark:
 
 ```sh
 pnpm benchmark:browser
 ```
 
-The default run uses Chromium, payload sizes of 1 KiB, 16 KiB, and 64 KiB, 1,000 envelope encode/decode iterations, 100 compression iterations, 100 transfer iterations, and 3 QR iterations. Select browser engines and workloads with environment variables:
+The default run uses Chromium, payload sizes of 1 KiB, 16 KiB, and 64 KiB,
+30 envelope encode/decode samples, 10 compression samples, 20 transfer samples,
+5 warmup encode/decode pairs, and 20 QR encode/reassembly samples (plus one QR
+warmup). Results are appended to JSONL as each payload size completes, and progress
+is printed before the QR stage so long QR workloads remain visible. The defaults are
+intended to complete as a practical local run rather than an extended soak test.
+Select browser engines and workloads with environment variables:
 
 ```sh
 SEE_BROWSERS=chromium,firefox,webkit pnpm benchmark:browser
 SEE_BROWSER_BENCH_SIZES=1024,16384,65536,262144 pnpm benchmark:browser
-SEE_BROWSER_BENCH_ITERATIONS=1000 pnpm benchmark:browser
+SEE_BROWSER_BENCH_ITERATIONS=30 pnpm benchmark:browser
+SEE_BROWSER_WARMUP=5 pnpm benchmark:browser
+SEE_BROWSER_QR_ITERATIONS=20 pnpm benchmark:browser
+SEE_BROWSER_QR_WARMUP=1 pnpm benchmark:browser
 ```
 
-Each run writes newline-delimited JSON under `benchmarks/results/`. The first record contains browser and device metadata; each following record contains the measured workload and latency percentiles.
+### Browser timing boundaries
+
+The browser report deliberately keeps library calls and browser integration work
+as separate measurements:
+
+- `encode` times only `encodeEnvelope`.
+- `decode` times only `decodeEnvelope`. Byte-for-byte correctness verification
+  runs after the timer stops.
+- `compressionRequestedEncode` times only `encodeEnvelope` with DEFLATE requested.
+  The subsequent decode and correctness check are outside that timer.
+- `fragmentation` times only `fragmentEnvelope`.
+- `reassembly` times fragment ingestion through `FragmentReassembler`; the
+  benchmark also verifies the reconstructed bytes.
+- `qrEncode` times only `encodeQrFrames`.
+- `qrDecodeAndReassembly` times only `reassembleQrFrames` on already-loaded image
+  objects. Image construction/loading is not included.
+- `imageLoad` is reported separately. It measures browser `Image`/data-URL loading,
+  not a signaling-library operation.
+- `endToEnd` is an integration measurement covering QR frame generation, browser
+  image loading, and QR reconstruction. It is not a library-only latency and must
+  not be used as the library's encode/decode performance figure.
+
+The browser harness warms the envelope APIs before sampling and performs a separate
+QR warmup. QR frames are encoded for every QR sample, then their image objects are
+loaded once and reused for repeated `reassembleQrFrames` samples. This keeps browser
+image decoding out of library reconstruction timings and avoids repeating an
+unnecessary browser operation for every library sample. Image loading is reported
+separately with its actual one-sample count.
+
+Timed regions exclude correctness comparisons and reporting work. Browser percentiles
+use four decimal places to preserve sub-millisecond values. p95 is emitted when a
+measurement has at least 20 samples; p99 is emitted at 100 samples. The default
+30-sample envelope and 20-sample QR runs therefore include p50 and p95.
+
+Each run writes newline-delimited JSON under `benchmarks/results/`. The metadata
+record is written before sampling, and each payload result is appended immediately
+when that payload completes. An interrupted run therefore retains completed records
+instead of losing the entire run.

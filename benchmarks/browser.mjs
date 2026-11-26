@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, writeFile } from 'node:fs/promises';
 import { createServer } from 'vite';
 import { chromium, firefox, webkit } from '@playwright/test';
 
@@ -19,14 +19,16 @@ const sizes = (process.env.SEE_BROWSER_BENCH_SIZES ?? '1024,16384,65536')
   .split(',')
   .map(Number)
   .filter((value) => Number.isSafeInteger(value) && value > 0);
-const iterations = Number(process.env.SEE_BROWSER_BENCH_ITERATIONS ?? 1_000);
-const qrIterations = Number(process.env.SEE_BROWSER_QR_ITERATIONS ?? 3);
-const compressionIterations = Number(process.env.SEE_BROWSER_COMPRESSION_ITERATIONS ?? 100);
-const transferIterations = Number(process.env.SEE_BROWSER_TRANSFER_ITERATIONS ?? 100);
+const iterations = Number(process.env.SEE_BROWSER_BENCH_ITERATIONS ?? 30);
+const qrIterations = Number(process.env.SEE_BROWSER_QR_ITERATIONS ?? 20);
+const warmupIterations = Number(process.env.SEE_BROWSER_WARMUP ?? 5);
+const qrWarmupIterations = Number(process.env.SEE_BROWSER_QR_WARMUP ?? 1);
+const compressionIterations = Number(process.env.SEE_BROWSER_COMPRESSION_ITERATIONS ?? 10);
+const transferIterations = Number(process.env.SEE_BROWSER_TRANSFER_ITERATIONS ?? 20);
 
 if (
   sizes.length === 0 ||
-  [iterations, qrIterations, compressionIterations, transferIterations].some(
+  [iterations, qrIterations, compressionIterations, transferIterations, warmupIterations, qrWarmupIterations].some(
     (value) => !Number.isSafeInteger(value) || value < 1,
   )
 ) {
@@ -43,9 +45,26 @@ try {
       context = await browser.newContext();
       const page = await context.newPage();
       const outputPath = `benchmarks/results/see-browser-${browserName}-${timestamp}.jsonl`;
-      const records = await page.goto('http://127.0.0.1:4173/tests/browser/fixture.html').then(async () => {
-        await page.waitForFunction(() => window.__SEE_READY__ === true);
-        return page.evaluate(async ({ sizes, iterations, qrIterations, compressionIterations, transferIterations }) => {
+      const browserVersion = browser.version();
+      await mkdir('benchmarks/results', { recursive: true });
+      await writeFile(outputPath, '');
+      await page.exposeFunction('__SEE_REPORT__', async (record) => {
+        if (record.recordType === 'browser-progress') {
+          process.stdout.write(`[${browserName}] ${record.message}\n`);
+          return;
+        }
+        await appendFile(outputPath, `${JSON.stringify({ ...record, browserName, browserVersion })}\n`);
+        if (record.recordType === 'browser-case') {
+          process.stdout.write(
+            `[${browserName}] ${record.payloadBytes} B complete ` +
+            `(encode p50 ${record.encode.p50Ms} ms, decode p50 ${record.decode.p50Ms} ms, ` +
+            `QR decode p50 ${record.qrDecodeAndReassembly.p50Ms} ms)\n`,
+          );
+        }
+      });
+      await page.goto('http://127.0.0.1:4173/tests/browser/fixture.html');
+      await page.waitForFunction(() => window.__SEE_READY__ === true);
+      await page.evaluate(async ({ sizes, iterations, warmupIterations, qrIterations, qrWarmupIterations, compressionIterations, transferIterations }) => {
           const see = window.SEE;
           const createdAt = 1_700_000_000_000;
           const createPayload = (size) => {
@@ -61,20 +80,21 @@ try {
           };
           const summarize = (samples) => {
             const sorted = [...samples].sort((left, right) => left - right);
-            const percentile = (fraction) => Number(sorted[Math.min(sorted.length - 1, Math.ceil(fraction * sorted.length) - 1)].toFixed(3));
+            const percentile = (fraction) => Number(sorted[Math.min(sorted.length - 1, Math.ceil(fraction * sorted.length) - 1)].toFixed(4));
             const total = samples.reduce((sum, value) => sum + value, 0);
             return {
               iterations: samples.length,
               p50Ms: percentile(0.5),
-              ...(samples.length >= 100
-                ? { p95Ms: percentile(0.95), p99Ms: percentile(0.99) }
-                : {}),
-              meanMs: Number((total / samples.length).toFixed(3)),
-              maxMs: Number(sorted.at(-1).toFixed(3)),
+              ...(samples.length >= 20 ? { p95Ms: percentile(0.95) } : {}),
+              ...(samples.length >= 100 ? { p99Ms: percentile(0.99) } : {}),
+              meanMs: Number((total / samples.length).toFixed(4)),
+              maxMs: Number(sorted.at(-1).toFixed(4)),
             };
           };
           const records = [{
             recordType: 'browser-metadata',
+            benchmark: 'SEE browser performance suite',
+            benchmarkVersion: 2,
             timestamp: new Date().toISOString(),
             userAgent: navigator.userAgent,
             platform: navigator.platform,
@@ -83,10 +103,13 @@ try {
             deviceMemoryGiB: navigator.deviceMemory ?? null,
             viewport: { width: innerWidth, height: innerHeight, devicePixelRatio },
             iterations,
+            warmupIterations,
             qrIterations,
+            qrWarmupIterations,
             compressionIterations,
             transferIterations,
           }];
+          await window.__SEE_REPORT__(records[0]);
 
           for (const payloadBytes of sizes) {
             const payload = createPayload(payloadBytes);
@@ -97,6 +120,13 @@ try {
               payload,
               compression: 'none',
             };
+            // Warm each library path before collecting samples. Validation stays
+            // outside timed regions so the measurements represent the API calls.
+            let warmEnvelope;
+            for (let index = 0; index < warmupIterations; index += 1) {
+              warmEnvelope = await see.encodeEnvelope(input);
+              await see.decodeEnvelope(warmEnvelope, { now: () => createdAt });
+            }
             const encodeSamples = [];
             const decodeSamples = [];
             let envelope;
@@ -108,10 +138,11 @@ try {
             for (let index = 0; index < iterations; index += 1) {
               const start = performance.now();
               const decoded = await see.decodeEnvelope(envelope, { now: () => createdAt });
+              const elapsed = performance.now() - start;
               if (!see.equalBytes(payload, decoded.payload)) {
                 throw new Error('Browser decode mismatch');
               }
-              decodeSamples.push(performance.now() - start);
+              decodeSamples.push(elapsed);
             }
 
             const compressionSamples = [];
@@ -141,35 +172,51 @@ try {
               const reassemblyStart = performance.now();
               let result;
               for (const fragment of fragments) result = await reassembler.add(fragment);
+              const reassemblyElapsed = performance.now() - reassemblyStart;
               if (result?.status !== 'complete' || !see.equalBytes(result.bytes, envelope)) {
                 throw new Error('Browser fragment reassembly mismatch');
               }
-              reassemblySamples.push(performance.now() - reassemblyStart);
+              reassemblySamples.push(reassemblyElapsed);
+            }
+
+            await window.__SEE_REPORT__({
+              recordType: 'browser-progress',
+              message: `${payloadBytes} B: starting QR encode/reassembly (${qrIterations} samples)`,
+            });
+            for (let index = 0; index < qrWarmupIterations; index += 1) {
+              const warmQrFrames = await see.encodeQrFrames(envelope, { errorCorrectionLevel: 'M' });
+              const warmQrImages = await Promise.all(
+                warmQrFrames.map((frame) => see.imageFromDataUrl(frame.dataUrl)),
+              );
+              await see.reassembleQrFrames(warmQrImages);
             }
 
             const qrEncodeSamples = [];
-            const imageLoadSamples = [];
             const qrDecodeSamples = [];
-            const endToEndSamples = [];
+            let frames;
             let qrFrameCount = 0;
             let svgCharacters = 0;
             for (let index = 0; index < qrIterations; index += 1) {
-              const endToEndStart = performance.now();
-              let start = performance.now();
-              const frames = await see.encodeQrFrames(envelope, { errorCorrectionLevel: 'M' });
+              const start = performance.now();
+              frames = await see.encodeQrFrames(envelope, { errorCorrectionLevel: 'M' });
               qrEncodeSamples.push(performance.now() - start);
               qrFrameCount = frames.length;
               svgCharacters = frames.reduce((sum, frame) => sum + frame.dataUrl.length, 0);
-              start = performance.now();
-              const images = await Promise.all(frames.map((frame) => see.imageFromDataUrl(frame.dataUrl)));
-              imageLoadSamples.push(performance.now() - start);
-              start = performance.now();
+            }
+
+            // Load each generated QR image once. Reuse the decoded image objects
+            // for library-only reconstruction samples so browser image decoding
+            // is never charged to the signaling library or repeated needlessly.
+            const imageLoadStart = performance.now();
+            const images = await Promise.all(frames.map((frame) => see.imageFromDataUrl(frame.dataUrl)));
+            const imageLoadSamples = [performance.now() - imageLoadStart];
+            for (let index = 0; index < qrIterations; index += 1) {
+              const start = performance.now();
               const reconstructed = await see.reassembleQrFrames(images);
               qrDecodeSamples.push(performance.now() - start);
               if (!see.equalBytes(envelope, reconstructed)) {
                 throw new Error('Browser QR round-trip mismatch');
               }
-              endToEndSamples.push(performance.now() - endToEndStart);
             }
 
             records.push({
@@ -188,19 +235,13 @@ try {
               qrEncode: summarize(qrEncodeSamples),
               imageLoad: summarize(imageLoadSamples),
               qrDecodeAndReassembly: summarize(qrDecodeSamples),
-              endToEnd: summarize(endToEndSamples),
               qrIterations,
               qrFrameCount,
               totalSvgDataUrlCharacters: svgCharacters,
             });
+            await window.__SEE_REPORT__(records.at(-1));
           }
-          return records;
-        }, { sizes, iterations, qrIterations, compressionIterations, transferIterations });
-      });
-      records[0].browserName = browserName;
-      records[0].browserVersion = browser.version();
-      await mkdir('benchmarks/results', { recursive: true });
-      await writeFile(outputPath, `${records.map((record) => JSON.stringify(record)).join('\n')}\n`);
+        }, { sizes, iterations, warmupIterations, qrIterations, qrWarmupIterations, compressionIterations, transferIterations });
       process.stdout.write(`${outputPath}\n`);
     } finally {
       await context?.close();
