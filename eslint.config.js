@@ -15,7 +15,7 @@ export default tseslint.config(
     languageOptions: { globals: globals.nodeBuiltin },
   },
   {
-    files: ['tests/browser/**/*.js', 'benchmarks/browser.mjs'],
+    files: ['tests/browser/**/*.{js,mjs}'],
     languageOptions: { globals: { ...globals.nodeBuiltin, ...globals.browser } },
   },
   {

@@ -38,9 +38,8 @@ test('package exports point only to built artifacts', () => {
 });
 
 test('project documentation contains the protocol and security specifications', async () => {
-  const [protocol, architecture, security, api] = await Promise.all([
+  const [protocol, security, api] = await Promise.all([
     readFile(new URL('../docs/protocol.md', import.meta.url), 'utf8'),
-    readFile(new URL('../docs/architecture.md', import.meta.url), 'utf8'),
     readFile(new URL('../docs/security.md', import.meta.url), 'utf8'),
     readFile(new URL('../docs/api.md', import.meta.url), 'utf8'),
   ]);

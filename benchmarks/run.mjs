@@ -428,7 +428,6 @@ for (const size of sizes) {
         payloadClass,
         payloadBytes: payload.byteLength,
         envelopeBytes: envelope.byteLength,
-        payloadBytes: payload.byteLength,
         encodedPayloadBytes,
         protocolOverheadBytes: envelope.byteLength - encodedPayloadBytes,
         envelopeSizeDeltaBytes: envelope.byteLength - payload.byteLength,
