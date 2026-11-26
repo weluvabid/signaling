@@ -19,7 +19,7 @@ const transferIterations = Number(
 );
 const throughputBatchSize = Number(process.env.BENCH_THROUGHPUT_BATCH ?? 100);
 const createdAt = 1_700_000_000_000;
-const benchmarkVersion = 3;
+const benchmarkVersion = 4;
 
 function assertIntegerInRange(name, value, minimum, maximum) {
   if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
@@ -83,16 +83,18 @@ function percentile(samples, fraction) {
 
 async function measure(operation, count, bytesPerOperation = 0) {
   const samples = [];
-  const batchStart = performance.now();
   for (let index = 0; index < count; index += 1) {
     const start = performance.now();
     await operation();
     samples.push(performance.now() - start);
   }
-  const totalMs = performance.now() - batchStart;
+  // Derive aggregate rates from the recorded operation samples, not from the
+  // outer harness loop (which also includes iteration and bookkeeping overhead).
+  const totalMs = samples.reduce((total, sample) => total + sample, 0);
   const totalBytes = bytesPerOperation * count;
   return {
     iterations: count,
+    samplesMs: samples.map((sample) => Number(sample.toFixed(6))),
     p50Ms: percentile(samples, 0.5),
     p95Ms: percentile(samples, 0.95),
     p99Ms: percentile(samples, 0.99),

@@ -50,7 +50,7 @@ test('project documentation contains the protocol and security specifications', 
   assert.match(api, /FragmentReassembler/u);
 });
 
-test('browser interoperability harness and benchmark methodology are documented', async () => {
+test('browser compatibility is tested without browser performance benchmarks', async () => {
   const [playwrightConfig, browserSuite, benchmarkGuide] = await Promise.all([
     readFile(new URL('../playwright.config.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../tests/browser/webrtc.spec.mjs', import.meta.url), 'utf8'),
@@ -65,4 +65,7 @@ test('browser interoperability harness and benchmark methodology are documented'
   assert.match(playwrightConfig, /reuseExistingServer: false/u);
   assert.match(browserSuite, /runPeerExchange/u);
   assert.match(benchmarkGuide, /pnpm test:browser/u);
+  assert.match(benchmarkGuide, /correctness and compatibility tests, not performance benchmarks/u);
+  assert.doesNotMatch(benchmarkGuide, /browser timing|browser benchmark|browser performance comparison/iu);
+  assert.equal('benchmark:browser' in packageJson.scripts, false);
 });

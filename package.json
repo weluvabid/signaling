@@ -53,7 +53,6 @@
     "verify:package": "node scripts/verify-package.mjs",
     "clean": "node scripts/clean.mjs",
     "test:browser": "playwright test",
-    "benchmark:browser": "pnpm build && node benchmarks/browser.mjs",
     "browsers:install": "playwright install chromium firefox webkit"
   },
   "dependencies": {
