@@ -24,13 +24,13 @@ The binary wire container is the **Signaling Exchange Envelope**. SEE is the lib
 
 ## Package entry points
 
-| Entry point | Purpose | Runtime requirements |
-| --- | --- | --- |
-| `@weluvabid/signaling` | Envelope, fragmentation, reassembly, limits and errors | Web Crypto; Compression Streams when compression is used |
-| `@weluvabid/signaling/file` | Blob/File import and export | `Blob` and `Blob.arrayBuffer()` |
-| `@weluvabid/signaling/clipboard` | Versioned base64url clipboard representation | Consumer-supplied `ClipboardPort` |
-| `@weluvabid/signaling/qr` | QR frame encoding and image decoding | Optional `qr` peer dependency; browser image element for decoding |
-| `@weluvabid/signaling/webrtc` | SDP/ICE payload mapping and ICE gathering observer | WebRTC browser types/runtime |
+| Entry point                      | Purpose                                                | Runtime requirements                                              |
+| -------------------------------- | ------------------------------------------------------ | ----------------------------------------------------------------- |
+| `@weluvabid/signaling`           | Envelope, fragmentation, reassembly, limits and errors | Web Crypto; Compression Streams when compression is used          |
+| `@weluvabid/signaling/file`      | Blob/File import and export                            | `Blob` and `Blob.arrayBuffer()`                                   |
+| `@weluvabid/signaling/clipboard` | Versioned base64url clipboard representation           | Consumer-supplied `ClipboardPort`                                 |
+| `@weluvabid/signaling/qr`        | QR frame encoding and image decoding                   | Optional `qr` peer dependency; browser image element for decoding |
+| `@weluvabid/signaling/webrtc`    | SDP/ICE payload mapping and ICE gathering observer     | WebRTC browser types/runtime                                      |
 
 Install the QR peer dependency when using the QR entry point:
 
@@ -79,21 +79,21 @@ For WebRTC, create the offer or answer with the application's `RTCPeerConnection
 
 Defaults are configurable within protocol hard ceilings.
 
-| Resource | Default |
-| --- | ---: |
-| Serialized envelope | 4 MiB |
-| Decompressed payload | 4 MiB |
-| CBOR nesting depth | 8 |
-| CBOR map/array entries | 64 |
-| CBOR total decoded items | 50,000 |
-| Fragment data | 16 KiB |
-| Fragment count | 1,024 |
-| Concurrent incomplete transfers | 4 |
-| Aggregate in-flight fragments | 4,096 |
-| Aggregate in-flight fragment bytes | 8 MiB |
-| Incomplete transfer lifetime | 5 minutes |
-| Maximum message lifetime | 24 hours |
-| Accepted clock skew | 5 minutes |
+| Resource                           |   Default |
+| ---------------------------------- | --------: |
+| Serialized envelope                |     4 MiB |
+| Decompressed payload               |     4 MiB |
+| CBOR nesting depth                 |         8 |
+| CBOR map/array entries             |        64 |
+| CBOR total decoded items           |    50,000 |
+| Fragment data                      |    16 KiB |
+| Fragment count                     |     1,024 |
+| Concurrent incomplete transfers    |         4 |
+| Aggregate in-flight fragments      |     4,096 |
+| Aggregate in-flight fragment bytes |     8 MiB |
+| Incomplete transfer lifetime       | 5 minutes |
+| Maximum message lifetime           |  24 hours |
+| Accepted clock skew                | 5 minutes |
 
 The general fragmenter defaults to 16 KiB payloads. The QR adapter caps fragment payloads at 850 bytes. With the default 1,024-frame limit, a QR transfer can carry approximately 850 KiB of envelope data. QR frames are SVG data URLs.
 

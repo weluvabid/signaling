@@ -31,7 +31,9 @@ function createPayload(size) {
 }
 
 function equalBytes(left, right) {
-  return left.byteLength === right.byteLength && left.every((value, index) => value === right[index]);
+  return (
+    left.byteLength === right.byteLength && left.every((value, index) => value === right[index])
+  );
 }
 
 async function imageFromDataUrl(dataUrl) {
@@ -47,20 +49,24 @@ async function reassembleQrFiles(files) {
   }
   const urls = [];
   try {
-    const images = await Promise.all(Array.from(files, async (file) => {
-      if (!file.type.startsWith('image/')) {
-        throw new TypeError(`${file.name} is not an image`);
-      }
-      const url = URL.createObjectURL(file);
-      urls.push(url);
-      const image = new Image();
-      image.src = url;
-      await image.decode();
-      return image;
-    }));
+    const images = await Promise.all(
+      Array.from(files, async (file) => {
+        if (!file.type.startsWith('image/')) {
+          throw new TypeError(`${file.name} is not an image`);
+        }
+        const url = URL.createObjectURL(file);
+        urls.push(url);
+        const image = new Image();
+        image.src = url;
+        await image.decode();
+        return image;
+      }),
+    );
     return await reassembleQrFrames(images, { retryBudgetMs: 5_000 });
   } finally {
-    for (const url of urls) URL.revokeObjectURL(url);
+    for (const url of urls) {
+      URL.revokeObjectURL(url);
+    }
   }
 }
 
@@ -78,32 +84,47 @@ async function runPeerExchange() {
   const answerer = new RTCPeerConnection({ iceServers: [] });
   const channelOpened = new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error('DataChannel did not open')), 20_000);
-    answerer.addEventListener('datachannel', ({ channel }) => {
-      channel.addEventListener('open', () => {
-        clearTimeout(timeout);
-        resolve(channel);
-      }, { once: true });
-    }, { once: true });
+    answerer.addEventListener(
+      'datachannel',
+      ({ channel }) => {
+        channel.addEventListener(
+          'open',
+          () => {
+            clearTimeout(timeout);
+            resolve(channel);
+          },
+          { once: true },
+        );
+      },
+      { once: true },
+    );
   });
   const channel = offerer.createDataChannel('see-browser-test');
   const channelOpen = new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error('Offerer DataChannel did not open')), 20_000);
-    channel.addEventListener('open', () => {
-      clearTimeout(timeout);
-      resolve();
-    }, { once: true });
+    channel.addEventListener(
+      'open',
+      () => {
+        clearTimeout(timeout);
+        resolve();
+      },
+      { once: true },
+    );
   });
 
   try {
     const offer = await offerer.createOffer();
     const localOffer = await gatherLocalDescription(offerer, offer);
-    const offerBytes = await encodeEnvelope(createDescriptionEnvelopeInput(
-      crypto.getRandomValues(new Uint8Array(16)),
-      localOffer,
-      { expiresAt: Date.now() + 60_000, compression: 'deflate' },
-    ));
+    const offerBytes = await encodeEnvelope(
+      createDescriptionEnvelopeInput(crypto.getRandomValues(new Uint8Array(16)), localOffer, {
+        expiresAt: Date.now() + 60_000,
+        compression: 'deflate',
+      }),
+    );
     const offerFrames = await encodeQrFrames(offerBytes);
-    const offerImages = await Promise.all(offerFrames.map((frame) => imageFromDataUrl(frame.dataUrl)));
+    const offerImages = await Promise.all(
+      offerFrames.map((frame) => imageFromDataUrl(frame.dataUrl)),
+    );
     const transferredOffer = await reassembleQrFrames(offerImages, { retryBudgetMs: 5_000 });
     const offerEnvelope = await decodeEnvelope(transferredOffer);
     const offerPayload = decodeWebRtcPayload(offerEnvelope);
@@ -111,17 +132,17 @@ async function runPeerExchange() {
 
     const answer = await answerer.createAnswer();
     const localAnswer = await gatherLocalDescription(answerer, answer);
-    const answerBytes = await encodeEnvelope(createDescriptionEnvelopeInput(
-      offerEnvelope.sessionId,
-      localAnswer,
-      {
+    const answerBytes = await encodeEnvelope(
+      createDescriptionEnvelopeInput(offerEnvelope.sessionId, localAnswer, {
         inReplyTo: offerEnvelope.messageId,
         expiresAt: Date.now() + 60_000,
         compression: 'deflate',
-      },
-    ));
+      }),
+    );
     const answerFrames = await encodeQrFrames(answerBytes);
-    const answerImages = await Promise.all(answerFrames.map((frame) => imageFromDataUrl(frame.dataUrl)));
+    const answerImages = await Promise.all(
+      answerFrames.map((frame) => imageFromDataUrl(frame.dataUrl)),
+    );
     const transferredAnswer = await reassembleQrFrames(answerImages, { retryBudgetMs: 5_000 });
     const answerEnvelope = await decodeEnvelope(transferredAnswer);
     if (!equalBytes(answerEnvelope.sessionId, offerEnvelope.sessionId)) {
@@ -136,10 +157,14 @@ async function runPeerExchange() {
     const remoteChannel = await channelOpened;
     const pong = new Promise((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('DataChannel response timed out')), 5_000);
-      channel.addEventListener('message', ({ data }) => {
-        clearTimeout(timeout);
-        resolve(data);
-      }, { once: true });
+      channel.addEventListener(
+        'message',
+        ({ data }) => {
+          clearTimeout(timeout);
+          resolve(data);
+        },
+        { once: true },
+      );
     });
     remoteChannel.addEventListener('message', ({ data }) => {
       if (data === 'SEE_PING') {

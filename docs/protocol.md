@@ -38,7 +38,7 @@ The top-level value is a CBOR map.
 | Key | Field           | CBOR type        | Required | Meaning                                            |
 | --: | --------------- | ---------------- | -------- | -------------------------------------------------- |
 |   0 | magic           | text             | yes      | Exact value `SEE`                                  |
-|   1 | version         | unsigned integer | yes      | `1` for SEE v1                                 |
+|   1 | version         | unsigned integer | yes      | `1` for SEE v1                                     |
 |   2 | session_id      | byte string      | yes      | 16 cryptographically random bytes                  |
 |   3 | message_id      | byte string      | yes      | 16 cryptographically random bytes                  |
 |   4 | kind            | unsigned integer | yes      | Message kind enum                                  |
@@ -58,7 +58,7 @@ The top-level value is a CBOR map.
 |     0 | offer     | Initiates a negotiation                       |
 |     1 | answer    | Responds to an offer                          |
 |     2 | candidate | Carries incremental ICE candidate information |
-|     3 | custom    | Application-defined payload                    |
+|     3 | custom    | Application-defined payload                   |
 
 A message kind describes the payload category. Consumers MUST validate application state before applying a message.
 

@@ -14,9 +14,7 @@ import { DEFAULT_LIMITS } from '../dist/core/limits.js';
 const sizes = [1_024, 16_384, 262_144, 1_048_576];
 const iterations = Number(process.env.BENCH_ITERATIONS ?? 1_000);
 const warmupIterations = Number(process.env.BENCH_WARMUP ?? 100);
-const transferIterations = Number(
-  process.env.BENCH_TRANSFER_ITERATIONS ?? 1_000,
-);
+const transferIterations = Number(process.env.BENCH_TRANSFER_ITERATIONS ?? 1_000);
 const throughputBatchSize = Number(process.env.BENCH_THROUGHPUT_BATCH ?? 100);
 const createdAt = 1_700_000_000_000;
 const benchmarkVersion = 4;
@@ -128,9 +126,15 @@ function deterministicShuffle(values, seed = 0x5eed) {
 }
 
 function orderFragments(fragments, order) {
-  if (order === 'ordered') return fragments;
-  if (order === 'reverse') return [...fragments].reverse();
-  if (order === 'shuffled') return deterministicShuffle(fragments);
+  if (order === 'ordered') {
+    return fragments;
+  }
+  if (order === 'reverse') {
+    return [...fragments].reverse();
+  }
+  if (order === 'shuffled') {
+    return deterministicShuffle(fragments);
+  }
   throw new RangeError(`Unknown fragment order: ${order}`);
 }
 
@@ -147,7 +151,9 @@ async function reassemble(fragments, order, duplicateMode = false) {
     peakRetainedFragments = Math.max(peakRetainedFragments, reassembler.inFlightFragments);
     peakActiveTransfers = Math.max(peakActiveTransfers, reassembler.activeTransfers);
     await pending;
-    if (duplicateMode) await reassembler.add(fragment);
+    if (duplicateMode) {
+      await reassembler.add(fragment);
+    }
   }
 
   if (
@@ -207,7 +213,9 @@ const fixtureCorpus = [
 
 function createFixturePayload(size) {
   let value = '';
-  while (value.length < size) value += fixtureCorpus;
+  while (value.length < size) {
+    value += fixtureCorpus;
+  }
   return new TextEncoder().encode(value).subarray(0, size);
 }
 
@@ -265,9 +273,13 @@ for (const size of sizes) {
       for (let index = 0; index < warmupIterations; index += 1) {
         envelope = await encodeEnvelope(encodeInput);
       }
-      const encode = await measure(async () => {
-        envelope = await encodeEnvelope(encodeInput);
-      }, iterations, payload.byteLength);
+      const encode = await measure(
+        async () => {
+          envelope = await encodeEnvelope(encodeInput);
+        },
+        iterations,
+        payload.byteLength,
+      );
 
       const decoded = await decodeEnvelope(envelope, { now: () => createdAt });
       const envelopeMap = decodeCanonical(envelope, DEFAULT_LIMITS);
@@ -291,7 +303,9 @@ for (const size of sizes) {
       for (let index = 0; index < warmupIterations; index += 1) {
         await decodeEnvelope(envelope, { now: () => createdAt });
         const reassembler = new FragmentReassembler();
-        for (const fragment of stressFragments) await reassembler.add(fragment);
+        for (const fragment of stressFragments) {
+          await reassembler.add(fragment);
+        }
       }
 
       const decode = await measure(
@@ -319,13 +333,17 @@ for (const size of sizes) {
       const reassemblyScenarios = [];
       for (const order of ['ordered', 'reverse', 'shuffled', 'duplicate-heavy']) {
         let peak = { peakRetainedBytes: 0, peakRetainedFragments: 0, peakActiveTransfers: 0 };
-        const result = await measure(async () => {
-          peak = await reassemble(
-            stressFragments,
-            order === 'duplicate-heavy' ? 'shuffled' : order,
-            order === 'duplicate-heavy',
-          );
-        }, transferIterations, envelope.byteLength);
+        const result = await measure(
+          async () => {
+            peak = await reassemble(
+              stressFragments,
+              order === 'duplicate-heavy' ? 'shuffled' : order,
+              order === 'duplicate-heavy',
+            );
+          },
+          transferIterations,
+          envelope.byteLength,
+        );
         const deliveredFragmentsPerTransfer =
           stressFragments.length * (order === 'duplicate-heavy' ? 2 : 1);
         reassemblyScenarios.push({
@@ -347,9 +365,13 @@ for (const size of sizes) {
           ),
         );
         let peak = { peakRetainedBytes: 0, peakRetainedFragments: 0, peakActiveTransfers: 0 };
-        const result = await measure(async () => {
-          peak = await reassembleConcurrent(fragmentSets);
-        }, transferIterations, envelope.byteLength * concurrency);
+        const result = await measure(
+          async () => {
+            peak = await reassembleConcurrent(fragmentSets);
+          },
+          transferIterations,
+          envelope.byteLength * concurrency,
+        );
         concurrentScenarios.push({
           concurrency,
           ...result,
@@ -379,16 +401,22 @@ for (const size of sizes) {
           await reassembler.add(limitFragments[4][0]);
           throw new Error('Expected the fifth concurrent transfer to be rejected');
         } catch (error) {
-          if (error?.code !== 'RESOURCE_LIMIT') throw error;
+          if (error?.code !== 'RESOURCE_LIMIT') {
+            throw error;
+          }
         }
         reassembler.clear();
       }, transferIterations);
 
-      const throughput = await measure(async () => {
-        for (let index = 0; index < throughputBatchSize; index += 1) {
-          await encodeEnvelope(encodeInput);
-        }
-      }, 1, payload.byteLength * throughputBatchSize);
+      const throughput = await measure(
+        async () => {
+          for (let index = 0; index < throughputBatchSize; index += 1) {
+            await encodeEnvelope(encodeInput);
+          }
+        },
+        1,
+        payload.byteLength * throughputBatchSize,
+      );
 
       throughput.encodeOperationsPerSecond = Number(
         (throughputBatchSize / (throughput.totalMs / 1_000)).toFixed(2),

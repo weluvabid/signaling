@@ -66,10 +66,12 @@ test('browser compatibility is tested without browser performance benchmarks', a
   assert.match(browserSuite, /runPeerExchange/u);
   assert.match(benchmarkGuide, /pnpm test:browser/u);
   assert.match(benchmarkGuide, /correctness and compatibility tests, not performance benchmarks/u);
-  assert.doesNotMatch(benchmarkGuide, /browser timing|browser benchmark|browser performance comparison/iu);
+  assert.doesNotMatch(
+    benchmarkGuide,
+    /browser timing|browser benchmark|browser performance comparison/iu,
+  );
   assert.equal('benchmark:browser' in packageJson.scripts, false);
 });
-
 
 test('project documentation records SEE origin, applications, and the latest benchmark artifact', async () => {
   const [readme, overview, applications, benchmarks, gitignore] = await Promise.all([

@@ -29,7 +29,9 @@ async function assertFragmentRoundTrip(envelopeBytes) {
   let complete;
   for (const fragment of [...fragments].reverse()) {
     const result = await reassembler.add(fragment);
-    if (result.status === 'complete') {complete = result.bytes;}
+    if (result.status === 'complete') {
+      complete = result.bytes;
+    }
   }
   assert.ok(complete, 'all fragments should produce a completed transfer');
   assert.deepEqual(complete, envelopeBytes, 'reassembly must be byte-exact');

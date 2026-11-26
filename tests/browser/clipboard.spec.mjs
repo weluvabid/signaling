@@ -1,7 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { openSeePage } from './support/fixture.mjs';
 
-test('clipboard transport round-trips through the browser clipboard', async ({ page, context, browserName }) => {
+test('clipboard transport round-trips through the browser clipboard', async ({
+  page,
+  context,
+  browserName,
+}) => {
   test.skip(browserName !== 'chromium', 'Clipboard permission support is exercised in Chromium.');
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await openSeePage(page);

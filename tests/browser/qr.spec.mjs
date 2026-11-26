@@ -13,7 +13,9 @@ test('QR frames round-trip through generated SVG images', async ({ page }) => {
       compression: 'none',
     });
     const frames = await window.SEE.encodeQrFrames(envelope, { errorCorrectionLevel: 'M' });
-    const images = await Promise.all(frames.map((frame) => window.SEE.imageFromDataUrl(frame.dataUrl)));
+    const images = await Promise.all(
+      frames.map((frame) => window.SEE.imageFromDataUrl(frame.dataUrl)),
+    );
     const reconstructed = await window.SEE.reassembleQrFrames(images, { retryBudgetMs: 5_000 });
     const decoded = await window.SEE.decodeEnvelope(reconstructed);
     return {
@@ -46,7 +48,9 @@ test('QR reassembly accepts frames delivered out of order', async ({ page }) => 
       compression: 'none',
     });
     const frames = await window.SEE.encodeQrFrames(envelope);
-    const images = await Promise.all(frames.map((frame) => window.SEE.imageFromDataUrl(frame.dataUrl)));
+    const images = await Promise.all(
+      frames.map((frame) => window.SEE.imageFromDataUrl(frame.dataUrl)),
+    );
     images.reverse();
     const reconstructed = await window.SEE.reassembleQrFrames(images, { retryBudgetMs: 5_000 });
     return window.SEE.equalBytes(envelope, reconstructed);

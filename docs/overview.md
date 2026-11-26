@@ -34,13 +34,13 @@ The `custom` message kind carries application-defined bytes with a caller-suppli
 
 ## Responsibilities
 
-| SEE | Consuming application |
-| --- | --- |
-| Encode and decode exchange envelopes | Define the application payload schema |
-| Compress payloads and verify integrity | Manage application state and interpretation |
-| Fragment and reassemble envelopes | Select and operate the delivery channel |
-| Provide file, clipboard, QR and WebRTC adapters | Authenticate peers and authorize exchanges |
-| Enforce configurable resource limits | Manage durable storage, retries and replay policy |
+| SEE                                             | Consuming application                             |
+| ----------------------------------------------- | ------------------------------------------------- |
+| Encode and decode exchange envelopes            | Define the application payload schema             |
+| Compress payloads and verify integrity          | Manage application state and interpretation       |
+| Fragment and reassemble envelopes               | Select and operate the delivery channel           |
+| Provide file, clipboard, QR and WebRTC adapters | Authenticate peers and authorize exchanges        |
+| Enforce configurable resource limits            | Manage durable storage, retries and replay policy |
 
 ## Further reading
 

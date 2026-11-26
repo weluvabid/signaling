@@ -13,12 +13,12 @@ pnpm benchmark
 
 The benchmark builds the package before running. Configuration is controlled with environment variables:
 
-| Variable | Default | Range |
-|---|---:|---:|
-| `BENCH_ITERATIONS` | 1,000 | 1,000–10,000 |
-| `BENCH_WARMUP` | 100 | 0–1,000 |
-| `BENCH_TRANSFER_ITERATIONS` | 1,000 | 100–1,000 |
-| `BENCH_THROUGHPUT_BATCH` | 100 | 10–1,000 |
+| Variable                    | Default |        Range |
+| --------------------------- | ------: | -----------: |
+| `BENCH_ITERATIONS`          |   1,000 | 1,000–10,000 |
+| `BENCH_WARMUP`              |     100 |      0–1,000 |
+| `BENCH_TRANSFER_ITERATIONS` |   1,000 |    100–1,000 |
+| `BENCH_THROUGHPUT_BATCH`    |     100 |     10–1,000 |
 
 ## Running and exporting a benchmark
 
@@ -116,16 +116,16 @@ The following values are from the latest archived run (`2026-11-26T16-55-25Z`). 
 
 ### 1 MiB payloads
 
-| Payload | Compression requested | Compression applied | Envelope bytes | Payload reduction | Encode p50 / p95 | Decode p50 / p95 | Fragments |
-|---|---|---|---:|---:|---:|---:|---:|
-| SDP-like | None | No | 1,048,712 | 0% | 0.427 / 0.615 | 0.852 / 0.924 | 65 |
-| SDP-like | DEFLATE | Yes | 4,958 | 99.53% | 1.946 / 2.207 | 0.722 / 1.661 | 1 |
-| ICE-heavy | None | No | 1,048,712 | 0% | 0.425 / 0.613 | 0.878 / 1.087 | 65 |
-| ICE-heavy | DEFLATE | Yes | 4,927 | 99.53% | 1.979 / 2.239 | 0.714 / 1.287 | 1 |
-| WebRTC fixtures | None | No | 1,048,712 | 0% | 0.425 / 0.598 | 4.299 / 4.400 | 65 |
-| WebRTC fixtures | DEFLATE | Yes | 6,540 | 99.38% | 2.042 / 2.339 | 0.718 / 0.979 | 1 |
-| Incompressible | None | No | 1,048,712 | 0% | 0.425 / 0.603 | 0.856 / 0.929 | 65 |
-| Incompressible | DEFLATE | No | 1,048,712 | 0% | 0.517 / 0.953 | 0.870 / 1.089 | 65 |
+| Payload         | Compression requested | Compression applied | Envelope bytes | Payload reduction | Encode p50 / p95 | Decode p50 / p95 | Fragments |
+| --------------- | --------------------- | ------------------- | -------------: | ----------------: | ---------------: | ---------------: | --------: |
+| SDP-like        | None                  | No                  |      1,048,712 |                0% |    0.427 / 0.615 |    0.852 / 0.924 |        65 |
+| SDP-like        | DEFLATE               | Yes                 |          4,958 |            99.53% |    1.946 / 2.207 |    0.722 / 1.661 |         1 |
+| ICE-heavy       | None                  | No                  |      1,048,712 |                0% |    0.425 / 0.613 |    0.878 / 1.087 |        65 |
+| ICE-heavy       | DEFLATE               | Yes                 |          4,927 |            99.53% |    1.979 / 2.239 |    0.714 / 1.287 |         1 |
+| WebRTC fixtures | None                  | No                  |      1,048,712 |                0% |    0.425 / 0.598 |    4.299 / 4.400 |        65 |
+| WebRTC fixtures | DEFLATE               | Yes                 |          6,540 |            99.38% |    2.042 / 2.339 |    0.718 / 0.979 |         1 |
+| Incompressible  | None                  | No                  |      1,048,712 |                0% |    0.425 / 0.603 |    0.856 / 0.929 |        65 |
+| Incompressible  | DEFLATE               | No                  |      1,048,712 |                0% |    0.517 / 0.953 |    0.870 / 1.089 |        65 |
 
 For structured payloads, DEFLATE reduces a 1 MiB payload to approximately 4.9–6.5 KiB and reduces the envelope from 65 fragments to one. Encoding takes approximately 1.95–2.04 ms at p50, compared with approximately 0.43 ms without compression. The smaller envelope reduces fragmentation p50 from approximately 0.60 ms to 0.02 ms and reassembly p50 from approximately 2.3 ms to 0.11–0.15 ms.
 
@@ -133,17 +133,17 @@ The incompressible workload is retained without compression. At 1 MiB, requestin
 
 ### Payload-size scaling
 
-| Payload class | Size | DEFLATE envelope bytes | Reduction | Fragments |
-|---|---:|---:|---:|---:|
-| SDP-like | 16 KiB | 445 | 97.31% | 1 |
-| SDP-like | 256 KiB | 1,529 | 99.42% | 1 |
-| SDP-like | 1 MiB | 4,958 | 99.53% | 1 |
-| ICE-heavy | 16 KiB | 417 | 97.47% | 1 |
-| ICE-heavy | 256 KiB | 1,498 | 99.43% | 1 |
-| ICE-heavy | 1 MiB | 4,927 | 99.53% | 1 |
-| WebRTC fixtures | 16 KiB | 975 | 94.05% | 1 |
-| WebRTC fixtures | 256 KiB | 2,349 | 99.10% | 1 |
-| WebRTC fixtures | 1 MiB | 6,540 | 99.38% | 1 |
+| Payload class   |    Size | DEFLATE envelope bytes | Reduction | Fragments |
+| --------------- | ------: | ---------------------: | --------: | --------: |
+| SDP-like        |  16 KiB |                    445 |    97.31% |         1 |
+| SDP-like        | 256 KiB |                  1,529 |    99.42% |         1 |
+| SDP-like        |   1 MiB |                  4,958 |    99.53% |         1 |
+| ICE-heavy       |  16 KiB |                    417 |    97.47% |         1 |
+| ICE-heavy       | 256 KiB |                  1,498 |    99.43% |         1 |
+| ICE-heavy       |   1 MiB |                  4,927 |    99.53% |         1 |
+| WebRTC fixtures |  16 KiB |                    975 |    94.05% |         1 |
+| WebRTC fixtures | 256 KiB |                  2,349 |    99.10% |         1 |
+| WebRTC fixtures |   1 MiB |                  6,540 |    99.38% |         1 |
 
 The WebRTC fixture workload is generated by concatenating the checked-in Chromium offer, Safari answer and ICE candidate fixture contents, repeating that corpus and truncating it to the requested payload size. The 256 KiB and 1 MiB cases are fixture-derived stress payloads rather than individual WebRTC messages.
 

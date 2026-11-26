@@ -7,11 +7,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const packageJson = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
 
 assert.equal(packageJson.type, 'module', 'The package must remain ESM-only');
-assert.equal(
-  packageJson.private,
-  true,
-  'The package is private',
-);
+assert.equal(packageJson.private, true, 'The package is private');
 assert.equal(packageJson.license, 'Apache-2.0');
 assert.equal(packageJson.sideEffects, false);
 assert.ok(packageJson.files.includes('dist'));

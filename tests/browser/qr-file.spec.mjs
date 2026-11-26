@@ -19,11 +19,13 @@ test('selected QR image files are decoded and reassembled in the browser', async
     }));
   });
 
-  await page.locator('#qr-files').setInputFiles(files.map((file) => ({
-    name: file.name,
-    mimeType: 'image/svg+xml',
-    buffer: Buffer.from(file.content),
-  })));
+  await page.locator('#qr-files').setInputFiles(
+    files.map((file) => ({
+      name: file.name,
+      mimeType: 'image/svg+xml',
+      buffer: Buffer.from(file.content),
+    })),
+  );
   const result = await page.evaluate(async () => {
     const input = document.querySelector('#qr-files');
     const bytes = await window.SEE.reassembleQrFiles(input.files);

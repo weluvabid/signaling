@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { openSeePage } from './support/fixture.mjs';
 
-test('two browser peers exchange SEE offer and answer envelopes over a DataChannel', async ({ page }) => {
+test('two browser peers exchange SEE offer and answer envelopes over a DataChannel', async ({
+  page,
+}) => {
   await openSeePage(page);
   const result = await page.evaluate(() => window.SEE.runPeerExchange());
 

@@ -55,11 +55,11 @@ These application-level fields and policies are defined by the consuming system;
 
 ## Future backlog
 
-| Area | Direction |
-| --- | --- |
-| Telemetry payload conventions | Define examples for time-windowed, multi-channel binary recordings |
-| Chunk sequencing | Document application-level recording IDs, sequence numbers and idempotent receipt |
-| Resumable transfer | Explore checkpointing and continuation across interrupted transfers |
-| Streaming integration | Explore bounded producer/consumer pipelines with backpressure |
-| Additional transports | Evaluate transports suited to larger payloads and intermittent links |
-| VSW demonstration | Build a separate end-to-end example that exports a recording, transfers it with SEE and imports it for analysis |
+| Area                          | Direction                                                                                                       |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Telemetry payload conventions | Define examples for time-windowed, multi-channel binary recordings                                              |
+| Chunk sequencing              | Document application-level recording IDs, sequence numbers and idempotent receipt                               |
+| Resumable transfer            | Explore checkpointing and continuation across interrupted transfers                                             |
+| Streaming integration         | Explore bounded producer/consumer pipelines with backpressure                                                   |
+| Additional transports         | Evaluate transports suited to larger payloads and intermittent links                                            |
+| VSW demonstration             | Build a separate end-to-end example that exports a recording, transfers it with SEE and imports it for analysis |

@@ -9,26 +9,33 @@ const RESULTS_DIR = join(process.cwd(), 'benchmarks', 'results');
 const EXPECTED_CASES = 4 * 4 * 2;
 
 function createRunId(date = new Date()) {
-  return date.toISOString().replaceAll(':', '-').replace(/\.\d{3}Z$/, 'Z');
+  return date
+    .toISOString()
+    .replaceAll(':', '-')
+    .replace(/\.\d{3}Z$/, 'Z');
 }
 
 function assertMeasurement(measurement, name, expectedIterations) {
   if (!measurement || measurement.iterations !== expectedIterations) {
     throw new Error(`${name}: iteration count does not match the run configuration`);
   }
-  if (!Array.isArray(measurement.samplesMs) ||
-      measurement.samplesMs.length !== measurement.iterations ||
-      measurement.samplesMs.some((sample) => !Number.isFinite(sample) || sample < 0)) {
+  if (
+    !Array.isArray(measurement.samplesMs) ||
+    measurement.samplesMs.length !== measurement.iterations ||
+    measurement.samplesMs.some((sample) => !Number.isFinite(sample) || sample < 0)
+  ) {
     throw new Error(`${name}: missing, malformed, or incomplete samplesMs`);
   }
 }
 
 function validateCase(record, metadata) {
-  if (record.recordType !== 'case' ||
-      !Number.isSafeInteger(record.payloadBytes) ||
-      !Number.isSafeInteger(record.envelopeBytes) ||
-      typeof record.payloadClass !== 'string' ||
-      !['none', 'deflate'].includes(record.compressionRequested)) {
+  if (
+    record.recordType !== 'case' ||
+    !Number.isSafeInteger(record.payloadBytes) ||
+    !Number.isSafeInteger(record.envelopeBytes) ||
+    typeof record.payloadClass !== 'string' ||
+    !['none', 'deflate'].includes(record.compressionRequested)
+  ) {
     throw new Error('Malformed benchmark case record');
   }
 
@@ -38,15 +45,24 @@ function validateCase(record, metadata) {
   assertMeasurement(record.reassembly, 'reassembly', metadata.transferIterations);
 
   for (const scenario of record.reassemblyScenarios ?? []) {
-    assertMeasurement(scenario, `reassemblyScenarios.${scenario.scenario}`,
-      metadata.transferIterations);
+    assertMeasurement(
+      scenario,
+      `reassemblyScenarios.${scenario.scenario}`,
+      metadata.transferIterations,
+    );
   }
   for (const scenario of record.concurrentScenarios ?? []) {
-    assertMeasurement(scenario, `concurrentScenarios.${scenario.concurrency}`,
-      metadata.transferIterations);
+    assertMeasurement(
+      scenario,
+      `concurrentScenarios.${scenario.concurrency}`,
+      metadata.transferIterations,
+    );
   }
-  assertMeasurement(record.concurrentLimitRejection, 'concurrentLimitRejection',
-    metadata.transferIterations);
+  assertMeasurement(
+    record.concurrentLimitRejection,
+    'concurrentLimitRejection',
+    metadata.transferIterations,
+  );
   assertMeasurement(record.encodeThroughputBatch, 'encodeThroughputBatch', 1);
 
   if (record.encodeThroughputBatch.batchSize !== metadata.throughputBatchSize) {
@@ -137,13 +153,17 @@ let parseError;
 
 child.stdout.setEncoding('utf8');
 child.stdout.on('data', (chunk) => {
-  if (parseError) return;
+  if (parseError) {
+    return;
+  }
   buffered += chunk;
   let newline;
   while ((newline = buffered.indexOf('\n')) !== -1) {
     const line = buffered.slice(0, newline);
     buffered = buffered.slice(newline + 1);
-    if (!line) continue;
+    if (!line) {
+      continue;
+    }
     try {
       const record = JSON.parse(line);
       if (!metadata) {
@@ -154,7 +174,9 @@ child.stdout.on('data', (chunk) => {
       } else {
         validateCase(record, metadata);
         const key = `${record.payloadClass}:${record.payloadBytes}:${record.compressionRequested}`;
-        if (seenCases.has(key)) throw new Error(`Duplicate benchmark case: ${key}`);
+        if (seenCases.has(key)) {
+          throw new Error(`Duplicate benchmark case: ${key}`);
+        }
         seenCases.add(key);
         cases.push(record);
       }
@@ -173,25 +195,43 @@ const [exitCode, exitSignal] = await once(child, 'close').then(([code, signal]) 
 output.end();
 await once(output, 'close');
 
-if (parseError) throw parseError;
-if (buffered.trim()) throw new Error('Benchmark emitted an incomplete trailing JSONL record');
-if (exitCode !== 0) throw new Error(`Benchmark process failed (${exitSignal ?? exitCode}); raw output retained at ${rawPath}`);
-if (!metadata) throw new Error('Benchmark produced no metadata record');
+if (parseError) {
+  throw parseError;
+}
+if (buffered.trim()) {
+  throw new Error('Benchmark emitted an incomplete trailing JSONL record');
+}
+if (exitCode !== 0) {
+  throw new Error(
+    `Benchmark process failed (${exitSignal ?? exitCode}); raw output retained at ${rawPath}`,
+  );
+}
+if (!metadata) {
+  throw new Error('Benchmark produced no metadata record');
+}
 if (cases.length !== EXPECTED_CASES) {
-  throw new Error(`Expected ${EXPECTED_CASES} cases, received ${cases.length}; raw output retained at ${rawPath}`);
+  throw new Error(
+    `Expected ${EXPECTED_CASES} cases, received ${cases.length}; raw output retained at ${rawPath}`,
+  );
 }
 
 const summary = summarize(metadata, cases);
-await writeFile(join(runDir, 'metadata.json'), `${JSON.stringify(metadata, null, 2)}\n`, { flag: 'wx' });
-await writeFile(join(runDir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`, { flag: 'wx' });
+await writeFile(join(runDir, 'metadata.json'), `${JSON.stringify(metadata, null, 2)}\n`, {
+  flag: 'wx',
+});
+await writeFile(join(runDir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`, {
+  flag: 'wx',
+});
 
-process.stdout.write([
-  '',
-  'SEE benchmark completed successfully.',
-  `  Run:      ${runId}`,
-  `  Cases:    ${cases.length}`,
-  `  Raw:      ${rawPath}`,
-  `  Summary:  ${join(runDir, 'summary.json')}`,
-  `  Metadata: ${join(runDir, 'metadata.json')}`,
-  '',
-].join('\n'));
+process.stdout.write(
+  [
+    '',
+    'SEE benchmark completed successfully.',
+    `  Run:      ${runId}`,
+    `  Cases:    ${cases.length}`,
+    `  Raw:      ${rawPath}`,
+    `  Summary:  ${join(runDir, 'summary.json')}`,
+    `  Metadata: ${join(runDir, 'metadata.json')}`,
+    '',
+  ].join('\n'),
+);
